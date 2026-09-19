@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+
+# MNIST downloads on first run
+data/
+
+# Checkpoints written by the notebook
+*.pt
+
+# The paper itself is linked in ./paper, not committed
+*.pdf
+
+.claude/settings.local.json
