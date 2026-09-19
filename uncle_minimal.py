@@ -10,6 +10,11 @@ The idea in three sentences:
 Nothing here is data-free by accident. Forgetting never touches the task's data,
 because all it needs is the task code and a noise generator.
 
+One deliberate departure from the paper: Appendix B splits the hypernetwork's
+last layer into one head per parameter type. This file keeps a single head,
+because the CNN below has no BatchNorm and no residual connections, so all its
+parameters fall into one type anyway. The uncle package implements the split.
+
 Run it:  python uncle_minimal.py
 """
 
@@ -83,7 +88,7 @@ target = nn.Sequential(
 
 # Where each weight tensor sits inside one long flat vector, and how much to
 # shrink it. The shrink factors turn unit-spread raw numbers into a textbook
-# He initialization, which is what an untrained network looks like.
+# He initialization, so the generated CNN starts out correctly scaled.
 layout, scales, offset = {}, {}, 0
 for name, parameter in target.named_parameters():
     layout[name] = (offset, parameter.shape)
@@ -170,7 +175,7 @@ def learn(task, protected):
     task_codes[task] = nn.Parameter(torch.randn(CODE_DIM, device=DEVICE))
     trainable = list(hypernet.parameters()) + [task_codes[task]]
     if len(task_codes) == 1:
-        trainable.append(chunk_codes)  # chunk codes are learned on the first task only
+        trainable.append(chunk_codes)  # Appendix B: learned on task one, then frozen
     optimizer = torch.optim.Adam(trainable, lr=LR)
 
     loader = DataLoader(
@@ -201,8 +206,10 @@ def forget(task, protected):
     for _ in range(BURN_IN):
         raw = raw_from(task_codes[task].detach(), hypernet, chunk_codes)
 
-        # Aim at several noise draws at once, so the hypernetwork learns
-        # "be noise" rather than memorizing one particular noise sample.
+        # The paper averages over fresh draws so the hypernetwork cannot
+        # memorize one noise sample. Because the draws are zero-mean, this
+        # actually drives the weights toward zero rather than toward noise.
+        # The task stops working either way. See the README.
         to_noise = sum(
             (raw - torch.randn_like(raw)).square().sum() for _ in range(NOISE_SAMPLES)
         ) / NOISE_SAMPLES

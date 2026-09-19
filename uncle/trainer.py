@@ -16,10 +16,12 @@ class UnCLe:
     def __init__(
         self,
         hypernet: HyperNetwork,
-        target: nn.Module,
-        tasks: dict[str, dict[str, Dataset]],
         config: Config,
+        target: nn.Module | None = None,
+        tasks: dict[str, dict[str, Dataset]] | None = None,
     ):
+        # target and tasks are only needed to measure accuracy and to learn.
+        # A caller that just wants `forget` can leave them out.
         self.hypernet = hypernet
         self.target = target
         self.tasks = tasks
@@ -60,9 +62,10 @@ class UnCLe:
         snapshot = self.hypernet.snapshot()
         code = self.hypernet.add_task(task)
 
-        # Chunk codes are learned on the first task only, then left alone.
+        # Appendix B: chunk codes are learned by backpropagation and frozen
+        # after the first task, to prevent catastrophic forgetting.
         first_task = len(self.hypernet.task_codes) == 1
-        trainable = [*self.hypernet.trunk.parameters(), code]
+        trainable = [*self.hypernet.generator_parameters(), code]
         if first_task:
             trainable.append(self.hypernet.chunk_codes)
 
@@ -115,7 +118,7 @@ class UnCLe:
             raise ValueError(f"Task {task} was never learned.")
 
         snapshot = self.hypernet.snapshot()
-        trainable = list(self.hypernet.trunk.parameters())
+        trainable = self.hypernet.generator_parameters()
 
         self.hypernet.requires_grad_(False)
         for parameter in trainable:
@@ -128,8 +131,12 @@ class UnCLe:
         for _ in range(self.config.burn_in):
             raw = self.hypernet.raw_for(task)
 
-            # Aim at several noise draws at once, so the hypernetwork learns
-            # "be noise" rather than memorizing one particular noise sample.
+            # The paper averages over fresh draws so the hypernetwork cannot
+            # memorize one noise sample. Because the draws are zero-mean, the
+            # average squared distance is ||raw||^2 + d, which is smallest at
+            # zero. So this collapses the generated weights toward zero rather
+            # than randomizing them. Either way the task stops working. See
+            # "What the noise objective actually does" in the README.
             to_noise = sum(
                 (raw - torch.randn_like(raw)).square().sum()
                 for _ in range(self.config.noise_samples)

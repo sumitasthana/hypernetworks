@@ -64,15 +64,52 @@ learning, so the paper reports four.
 Spill and relapse are the two failure modes the paper identifies in existing
 unlearning methods. Neither shows up in accuracy at the end of a run.
 
+## What the noise objective actually does
+
+Equation 3 asks the hypernetwork to make a forgotten task's generated weights
+match a Gaussian noise sample, averaged over several fresh draws each step.
+The paper describes the result as returning the task to a random
+initialization.
+
+The averaging does something different. For zero-mean noise `z`, the expected
+value of `||x - z||^2` is `||x||^2 + d`, which is smallest at `x = 0`. So
+averaging over fresh draws drives the generated weights toward **zero**, not
+toward noise. Measured over 3,000 steps on a 2,000-value vector:
+
+| Noise strategy | Final spread of the weights |
+| --- | --- |
+| Averaged over 10 fresh draws each step (the paper) | 0.04 |
+| One fresh draw each step | 0.07 |
+| One fixed draw, reused every step | 0.98 |
+
+Only the fixed draw lands on something noise-shaped. That variant is the
+"Fixed-noise Alignment" the paper compares against in Appendix E and reports
+as worse.
+
+This does not break unlearning. A collapsed generator cannot classify, so
+forget accuracy still lands at chance, which is what the metric asks for. But
+it is worth knowing that the mechanism is weight collapse rather than
+randomization, because the two differ in one way that could matter: a
+collapsed network is identical for every forgotten task, while a randomized
+one is not.
+
 ## Differences from the paper
 
 | Here | Paper |
 | --- | --- |
 | 4-layer CNN, 20k weights | ResNet18 or ResNet50 |
 | No normalization layers | BatchNorm, which needs per-task running statistics |
-| One output head | Separate heads per parameter group |
 | Kaiming init with output scaling | Hyperfan initialization |
 | 3 tasks, 4 requests | Up to 20 tasks, 30 requests |
 
 The mechanism is the same. The scale is not, so treat the numbers here as a
 demonstration that it works, not as a reproduction of the paper's results.
+
+Two things that are the paper's design, not ours, in case the notebook's
+assumptions table suggests otherwise. Appendix B specifies one output head per
+parameter type, which `uncle/hypernet.py` implements: batch normalization
+parameters, residual connection parameters, and ordinary weights. It also
+specifies that chunk codes are learned by backpropagation and then frozen
+after the first task. Our CNN target has no BatchNorm and no residual
+connections, so the split produces a single head here; give `HyperNetwork` a
+ResNet and it produces three.

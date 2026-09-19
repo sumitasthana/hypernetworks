@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 import torch
+from torch import nn
 from torch.utils.data import Dataset
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -54,7 +55,7 @@ def build(**overrides):
     target = build_target(config.torch_device)
     hypernet = HyperNetwork(target, config)
 
-    return UnCLe(hypernet, target, tasks, config), hypernet, target
+    return UnCLe(hypernet, config, target, tasks), hypernet, target
 
 
 def test_config_rejects_bad_requests():
@@ -82,6 +83,47 @@ def test_generated_weights_fit_the_target():
     for name, value in weights.items():
         assert value.shape == expected[name].shape, f"{name} has the wrong shape"
         assert torch.isfinite(value).all(), f"{name} is not finite"
+
+
+def test_heads_split_by_parameter_type():
+    """Appendix B: one head for weights, one for BatchNorm, one for residuals."""
+    config = Config(tasks=("A",), requests=(("learn", "A"),), chunks=16, device="cpu")
+
+    resnet_shaped = nn.Sequential()
+    resnet_shaped.add_module("conv", nn.Conv2d(1, 4, 3, padding=1, bias=False))
+    resnet_shaped.add_module("bn", nn.BatchNorm2d(4))
+    resnet_shaped.add_module("downsample", nn.Conv2d(4, 8, 1, bias=False))
+    resnet_shaped.add_module("head", nn.Linear(8 * 28 * 28, 10))
+
+    hypernet = HyperNetwork(resnet_shaped, config)
+
+    assert set(hypernet.heads) == {"weights", "batchnorm", "residual"}
+    assert hypernet.layout["bn.weight"][0] == "batchnorm"
+    assert hypernet.layout["downsample.weight"][0] == "residual"
+    assert hypernet.layout["conv.weight"][0] == "weights"
+
+    # Every head gets at least one chunk and the budget is spent exactly.
+    assert sum(hypernet.chunk_counts.values()) == config.chunks
+    assert all(count >= 1 for count in hypernet.chunk_counts.values())
+
+    # Generation still reproduces every tensor of the target, exactly once.
+    hypernet.add_task("A")
+    weights = hypernet.weights_for("A")
+    expected = dict(resnet_shaped.named_parameters())
+
+    assert set(weights) == set(expected)
+    for name, value in weights.items():
+        assert value.shape == expected[name].shape, name
+
+    assert hypernet.raw_for("A").numel() == sum(
+        p.numel() for p in expected.values()
+    )
+
+
+def test_one_head_when_the_target_has_one_parameter_type():
+    """Our plain CNN has no BatchNorm and no residuals, so one head is correct."""
+    _, hypernet, _ = build()
+    assert set(hypernet.heads) == {"weights"}
 
 
 def test_snapshot_does_not_follow_the_live_network():

@@ -21,7 +21,7 @@ def run(config: Config, on_request: Callable[[dict], None] | None = None) -> lis
     tasks = build_tasks(config)
     target = build_target(config.torch_device)
     hypernet = HyperNetwork(target, config)
-    uncle = UnCLe(hypernet, target, tasks, config)
+    uncle = UnCLe(hypernet, config, target, tasks)
 
     history: list[dict] = []
     seen: list[str] = []

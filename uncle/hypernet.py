@@ -1,19 +1,29 @@
-"""The network that produces another network's weights."""
+"""The network that produces another network's weights.
+
+Follows the architecture in the paper's Appendix B: parameters are generated
+in chunks, a chunk code is concatenated with the task code to form one
+task-chunk pair per chunk, and the last layer is split into one head per
+parameter type.
+"""
 
 import copy
+import math
 
 import torch
 from torch import nn
 
 from .config import Config
 
+BATCHNORM = (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)
+
 
 def build_target(device: torch.device) -> nn.Module:
     """The CNN whose weights get generated.
 
     It is never trained. Every forward pass receives a fresh set of weights, so
-    its own values are only a template for the shapes. No normalization layers,
-    which is what keeps this file free of per-task running statistics.
+    its own values are only a template for the shapes. The paper uses ResNet18
+    for Permuted-MNIST and ResNet50 elsewhere; this is a small stand-in so the
+    package runs on a CPU in a couple of minutes.
     """
     target = nn.Sequential(
         nn.Conv2d(1, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
@@ -23,52 +33,118 @@ def build_target(device: torch.device) -> nn.Module:
     return target.to(device).requires_grad_(False)
 
 
+def parameter_group(module: nn.Module, module_name: str) -> str:
+    """Which output head generates this parameter.
+
+    Appendix B splits the hypernetwork's final layer into heads by parameter
+    type: batch normalization parameters, residual connection parameters, and
+    ordinary network weights.
+    """
+    if isinstance(module, BATCHNORM):
+        return "batchnorm"
+    if "downsample" in module_name or "shortcut" in module_name:
+        return "residual"
+    return "weights"
+
+
+def allocate_chunks(sizes: dict[str, int], chunks: int) -> dict[str, int]:
+    """Share the chunk budget across the heads.
+
+    The paper fixes the total at 200 chunks per task-specific network but does
+    not say how they are split between heads. This gives every head at least
+    one chunk and divides the rest in proportion to how many numbers it owns.
+    """
+    if chunks < len(sizes):
+        raise ValueError(f"chunks must be at least {len(sizes)}, one per head.")
+
+    total = sum(sizes.values())
+    spare = chunks - len(sizes)
+    shares = {group: spare * size / total for group, size in sizes.items()}
+    counts = {group: 1 + math.floor(share) for group, share in shares.items()}
+
+    # Hand the rounding leftovers to the heads with the largest fractions.
+    leftover = chunks - sum(counts.values())
+    ranked = sorted(shares, key=lambda group: shares[group] % 1, reverse=True)
+    for group in ranked[:leftover]:
+        counts[group] += 1
+
+    return counts
+
+
 class HyperNetwork(nn.Module):
     """Turns a short task code into a full set of weights for `target`.
 
-    Holds three trainable things: the shared trunk, one code per chunk of the
-    target's weights, and one code per task.
+    This is H(.; phi) in the paper. It holds four trainable things: the shared
+    trunk, one output head per parameter type, one code per chunk, and one code
+    per task.
     """
 
     def __init__(self, target: nn.Module, config: Config):
         super().__init__()
         self.config = config
-        self.chunks = config.chunks
 
-        # Where each weight tensor sits inside one long flat vector, and how
-        # much to shrink it. The shrink factors turn unit-spread raw numbers
-        # into a textbook He initialization, which is what an untrained
-        # network looks like. That is the state a forget request returns to.
-        self.layout: dict[str, tuple[int, torch.Size]] = {}
+        modules = dict(target.named_modules())
+
+        # Where each weight tensor sits inside its head's output, and how much
+        # to shrink it. The shrink factors turn unit-spread raw numbers into a
+        # textbook He initialization, so the generated network starts out
+        # correctly scaled.
+        self.layout: dict[str, tuple[str, int, torch.Size]] = {}
         self.scales: dict[str, float] = {}
-        offset = 0
+        sizes: dict[str, int] = {}
+
         for name, parameter in target.named_parameters():
-            self.layout[name] = (offset, parameter.shape)
+            module_name = name.rpartition(".")[0]
+            group = parameter_group(modules[module_name], module_name)
+
+            start = sizes.get(group, 0)
+            self.layout[name] = (group, start, parameter.shape)
+            sizes[group] = start + parameter.numel()
+
             fan_in = parameter[0].numel() if parameter.dim() > 1 else 1
             self.scales[name] = (2 / fan_in) ** 0.5 if parameter.dim() > 1 else 0.01
-            offset += parameter.numel()
 
-        self.total = offset
-        self.width = -(-self.total // self.chunks)  # per chunk, rounded up
+        self.group_sizes = sizes
+        self.group_order = list(sizes)
+        self.total = sum(sizes.values())
+
+        self.chunk_counts = allocate_chunks(sizes, config.chunks)
+        self.chunk_widths = {
+            group: -(-sizes[group] // self.chunk_counts[group]) for group in sizes
+        }
+
+        # Which rows of chunk_codes belong to which head.
+        self.chunk_slices: dict[str, slice] = {}
+        first = 0
+        for group in self.group_order:
+            count = self.chunk_counts[group]
+            self.chunk_slices[group] = slice(first, first + count)
+            first += count
 
         widths = [2 * config.code_dim, *config.hidden]
         layers: list[nn.Module] = []
         for inputs, outputs in zip(widths[:-1], widths[1:]):
             layers += [nn.Linear(inputs, outputs), nn.ReLU()]
-        layers.append(nn.Linear(widths[-1], self.width))
         self.trunk = nn.Sequential(*layers)
+
+        self.heads = nn.ModuleDict({
+            group: nn.Linear(widths[-1], self.chunk_widths[group])
+            for group in self.group_order
+        })
 
         for layer in self.trunk:
             if isinstance(layer, nn.Linear):
                 nn.init.kaiming_normal_(layer.weight, nonlinearity="relu")
                 nn.init.zeros_(layer.bias)
 
-        # The last layer aims for raw outputs with spread near 1, so that after
-        # the shrink factors the generated CNN starts out correctly initialized.
-        nn.init.normal_(self.trunk[-1].weight, std=widths[-1] ** -0.5)
+        # Heads aim for raw outputs with spread near 1, so that after the
+        # scale factors the generated network starts out correctly initialized.
+        for head in self.heads.values():
+            nn.init.normal_(head.weight, std=widths[-1] ** -0.5)
+            nn.init.zeros_(head.bias)
 
         self.chunk_codes = nn.Parameter(
-            torch.randn(self.chunks, config.code_dim, device=config.torch_device)
+            torch.randn(config.chunks, config.code_dim, device=config.torch_device)
         )
         self.task_codes = nn.ParameterDict()
         self.to(config.torch_device)
@@ -91,18 +167,31 @@ class HyperNetwork(nn.Module):
 
     # -- generation ----------------------------------------------------------
 
+    def _raw_groups(self, code: torch.Tensor) -> dict[str, torch.Tensor]:
+        """Each head's unscaled output, padding removed."""
+        generated = {}
+
+        for group in self.group_order:
+            codes = self.chunk_codes[self.chunk_slices[group]]
+            # One task-chunk pair per chunk, all run through the trunk at once.
+            pairs = torch.cat([code.expand(codes.shape[0], -1), codes], dim=1)
+            raw = self.heads[group](self.trunk(pairs)).reshape(-1)
+            generated[group] = raw[:self.group_sizes[group]]
+
+        return generated
+
     def raw_from_code(self, code: torch.Tensor) -> torch.Tensor:
-        """One task code in, one flat vector of unscaled numbers out."""
-        # Pair the task code with every chunk code, then run all chunks at once.
-        pairs = torch.cat([code.expand(self.chunks, -1), self.chunk_codes], dim=1)
-        return self.trunk(pairs).reshape(-1)[:self.total]
+        """Every generated number before scaling, as one flat vector."""
+        generated = self._raw_groups(code)
+        return torch.cat([generated[group] for group in self.group_order])
 
     def weights_from_code(self, code: torch.Tensor) -> dict[str, torch.Tensor]:
-        """One task code in, a full set of target weights out."""
-        raw = self.raw_from_code(code)
+        """One task code in, a full set of target weights out: theta = H(e; phi)."""
+        generated = self._raw_groups(code)
         return {
-            name: raw[start:start + shape.numel()].reshape(shape) * self.scales[name]
-            for name, (start, shape) in self.layout.items()
+            name: generated[group][start:start + shape.numel()].reshape(shape)
+                  * self.scales[name]
+            for name, (group, start, shape) in self.layout.items()
         }
 
     def weights_for(self, task: str) -> dict[str, torch.Tensor]:
@@ -111,10 +200,19 @@ class HyperNetwork(nn.Module):
     def raw_for(self, task: str) -> torch.Tensor:
         return self.raw_from_code(self.task_codes[task])
 
+    def generator_parameters(self) -> list:
+        """The weights that learning and forgetting update: phi in the paper.
+
+        Task codes and chunk codes are handled separately, so this is its own
+        method rather than `self.parameters()`. Anything presenting itself to
+        `UnCLe` as a hypernetwork must offer this.
+        """
+        return [*self.trunk.parameters(), *self.heads.parameters()]
+
     # -- snapshots -----------------------------------------------------------
 
     def snapshot(self) -> "HyperNetwork":
-        """A frozen copy of this network as it is right now.
+        """A frozen copy of this network as it is right now: phi* in the paper.
 
         Learning and forgetting both compare against a snapshot taken before
         the request started. That comparison is the paper's regularizer.
