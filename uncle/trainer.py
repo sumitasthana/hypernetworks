@@ -1,4 +1,10 @@
-"""The two operations: learn a task, forget a task."""
+"""The two operations: learn a task, forget a task.
+
+The hypernetwork generates parameters. It does not generate buffers, and
+BatchNorm's running mean and variance are buffers. So each task keeps its own
+set, updated only while that task is being learned, and held still during
+evaluation and forgetting.
+"""
 
 import torch
 import torch.nn.functional as F
@@ -27,6 +33,14 @@ class UnCLe:
         self.tasks = tasks
         self.config = config
         self.device = config.torch_device
+
+        # A clean set of running statistics for every new task to start from.
+        self.buffer_template: dict[str, torch.Tensor] = (
+            {name: value.detach().clone() for name, value in target.named_buffers()}
+            if target is not None
+            else {}
+        )
+        self.task_buffers: dict[str, dict[str, torch.Tensor]] = {}
 
     # -- the shared regularizer ---------------------------------------------
 
@@ -62,6 +76,11 @@ class UnCLe:
         snapshot = self.hypernet.snapshot()
         code = self.hypernet.add_task(task)
 
+        # This task's own running statistics, updated only by this loop.
+        self.task_buffers[task] = {
+            name: value.clone() for name, value in self.buffer_template.items()
+        }
+
         # Appendix B: chunk codes are learned by backpropagation and frozen
         # after the first task, to prevent catastrophic forgetting.
         first_task = len(self.hypernet.task_codes) == 1
@@ -82,6 +101,7 @@ class UnCLe:
         )
 
         self.hypernet.train()
+        self.target.train()
         epoch_losses = []
 
         for _ in range(self.config.epochs):
@@ -89,7 +109,14 @@ class UnCLe:
 
             for images, labels in loader:
                 weights = self.hypernet.weights_for(task)
-                scores = functional_call(self.target, weights, (images.to(self.device),))
+                # Passing this task's buffers lets BatchNorm update them here,
+                # and only here.
+                scores = functional_call(
+                    self.target,
+                    (weights, self.task_buffers[task]),
+                    (images.to(self.device),),
+                    strict=True,
+                )
 
                 loss = F.cross_entropy(scores, labels.to(self.device))
                 loss = loss + self.config.beta * self.preserve(protected, snapshot)
@@ -107,15 +134,23 @@ class UnCLe:
 
     # -- forget --------------------------------------------------------------
 
-    def forget(self, task: str, protected: list[str]) -> list[float]:
+    def forget(
+        self, task: str, protected: list[str], burn_in: int | None = None
+    ) -> list[float]:
         """Teach the hypernetwork to turn one task's code into noise. Paper eq. 3.
 
         No data loader appears below. Forgetting needs only the task's code and
         a noise generator, which is what makes it usable in a continual setting
         where the task's data is long gone.
+
+        This leaves the task's BatchNorm buffers alone, because eq. 3 covers
+        generated parameters only. Those statistics are still derived from the
+        forgotten task's data. See the README.
         """
         if task not in self.hypernet.task_codes:
             raise ValueError(f"Task {task} was never learned.")
+
+        iterations = self.config.burn_in if burn_in is None else burn_in
 
         snapshot = self.hypernet.snapshot()
         trainable = self.hypernet.generator_parameters()
@@ -128,7 +163,7 @@ class UnCLe:
         self.hypernet.train()
         losses = []
 
-        for _ in range(self.config.burn_in):
+        for _ in range(iterations):
             raw = self.hypernet.raw_for(task)
 
             # The paper averages over fresh draws so the hypernetwork cannot
@@ -158,14 +193,23 @@ class UnCLe:
     def accuracy(self, task: str, split: str = "test") -> float:
         """Accuracy of the network this task's code currently produces."""
         self.hypernet.eval()
+        self.target.eval()
+
         weights = self.hypernet.weights_for(task)
+        # Copies, so measuring cannot disturb the stored statistics.
+        buffers = {
+            name: value.clone() for name, value in self.task_buffers[task].items()
+        }
+
         loader = DataLoader(
             self.tasks[task][split], batch_size=self.config.eval_batch_size
         )
 
         correct, total = 0, 0
         for images, labels in loader:
-            scores = functional_call(self.target, weights, (images.to(self.device),))
+            scores = functional_call(
+                self.target, (weights, buffers), (images.to(self.device),), strict=True
+            )
             correct += (scores.argmax(1) == labels.to(self.device)).sum().item()
             total += labels.numel()
 

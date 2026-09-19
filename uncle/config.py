@@ -1,8 +1,30 @@
-"""Every knob in one place."""
+"""Every knob in one place, with the paper's values as the defaults."""
 
 from dataclasses import dataclass, field
 
 import torch
+
+# Appendix C, Table 4. The author runs three random request sequences per
+# dataset. `L#n` means learn task n, `U#n` means unlearn task n.
+PERMUTED_MNIST_SEQUENCES = {
+    1: "L1 L0 U1 L5 L8 L9 L7 U0 L2 L3 L4 U8 U3 U5 L6",
+    2: "L6 L7 L2 L1 L0 U1 L9 U7 U2 U0 L4 U4 L8 U6 L5",
+    3: "L7 L1 L2 L8 L0 U1 L3 L6 U3 U2 L4 L5 U8 L9 U7",
+}
+
+FIVE_TASKS_SEQUENCES = {
+    1: "L0 L1 U0 L2 L3 L4 U1",
+    2: "L3 L4 L2 L0 L1 U3 U0",
+    3: "L0 L2 U0 L4 L3 U2 U4",
+}
+
+
+def parse_sequence(text: str) -> tuple[tuple[str, str], ...]:
+    """Turn "L1 L0 U1" into (("learn", "1"), ("learn", "0"), ("forget", "1"))."""
+    actions = {"L": "learn", "U": "forget"}
+    return tuple(
+        (actions[token[0]], token[1:]) for token in text.split()
+    )
 
 
 def _default_device() -> str:
@@ -13,31 +35,36 @@ def _default_device() -> str:
 class Config:
     """Settings for one continual learn and unlearn experiment.
 
-    A request is a pair such as ("learn", "A") or ("forget", "A").
+    The defaults are the paper's Permuted-MNIST setting: ResNet18 generated in
+    200 chunks, 10 tasks, and request sequence 1 from Table 4. That needs a
+    GPU. For a quick CPU run pass backbone="cnn" with fewer chunks and tasks.
     """
 
-    tasks: tuple[str, ...] = ("A", "B", "C")
-    requests: tuple[tuple[str, str], ...] = (
-        ("learn", "A"),
-        ("learn", "B"),
-        ("forget", "A"),
-        ("learn", "C"),
+    tasks: tuple[str, ...] = tuple(str(index) for index in range(10))
+    requests: tuple[tuple[str, str], ...] = parse_sequence(
+        PERMUTED_MNIST_SEQUENCES[1]
     )
 
+    backbone: str = "resnet18"        # "resnet18", "resnet50", or "cnn"
     seed: int = 0
-    epochs: int = 1
-    batch_size: int = 128
-    eval_batch_size: int = 512
-    learning_rate: float = 1e-3
+    epochs: int = 5
+    batch_size: int = 64
+    eval_batch_size: int = 256
+    learning_rate: float = 1e-3       # Adam, the paper's value
 
-    beta: float = 0.1     # strength of the hold-other-tasks-still term (paper eq. 2)
-    gamma: float = 0.01   # strength of the push-toward-noise term (paper eq. 3)
+    beta: float = 0.1     # hold-other-tasks-still term, eq. 2. Paper: 0.1 for PMNIST
+    gamma: float = 0.01   # push-toward-noise term, eq. 3. Paper: 0.01 for PMNIST
 
-    code_dim: int = 32               # length of a task code and of a chunk code
-    chunks: int = 32                 # how many slices the target weights arrive in
+    code_dim: int = 32               # Appendix B: task and chunk codes are both 32
+    chunks: int = 200                # Appendix B: 200 chunks per task network
     hidden: tuple[int, ...] = (128, 256, 512)
-    noise_samples: int = 10
-    burn_in: int = 100               # optimizer steps spent on one forget request
+    noise_samples: int = 10          # n in eq. 3
+
+    # Appendix C: burn-in starts at 100 and drops 10% after each unlearn,
+    # never below 20.
+    burn_in: int = 100
+    burn_in_decay: float = 0.9
+    burn_in_min: int = 20
 
     data_root: str = "./data"
     device: str = field(default_factory=_default_device)
@@ -64,11 +91,20 @@ class Config:
                     raise ValueError(f"Task {task} is forgotten twice.")
                 forgotten.add(task)
 
+        if self.backbone not in ("resnet18", "resnet50", "cnn"):
+            raise ValueError(f"Unknown backbone: {self.backbone}")
         if self.chunks < 1:
             raise ValueError("chunks must be at least 1.")
         if not self.hidden:
             raise ValueError("hidden must name at least one layer width.")
+        if not 0 < self.burn_in_decay <= 1:
+            raise ValueError("burn_in_decay must be in (0, 1].")
 
     @property
     def torch_device(self) -> torch.device:
         return torch.device(self.device)
+
+    def burn_in_for(self, completed_forgets: int) -> int:
+        """Appendix C's annealed burn-in for the next unlearn request."""
+        annealed = int(self.burn_in * self.burn_in_decay ** completed_forgets)
+        return max(self.burn_in_min, annealed)

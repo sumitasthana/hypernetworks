@@ -10,17 +10,24 @@ which needs no data at all.
 
 ## Run it
 
+The defaults are the paper's Permuted-MNIST setting: ResNet18 generated in 200
+chunks, 10 tasks, and request sequence 1 from Table 4. That wants a GPU.
+
 ```bash
 pip install -r requirements.txt
-python main.py
+python main.py                     # the paper's setting
+python main.py --sequence 2        # sequences 1, 2 and 3 are all from Table 4
 ```
 
-About two minutes on a CPU. Then:
+For a quick check without a GPU, swap in the small stand-in network:
 
 ```bash
-python tests/test_uncle.py      # seven checks, seconds, no download
-python main.py --epochs 3 --chunks 64
+python main.py --backbone cnn --chunks 32 --epochs 1
+python tests/test_uncle.py         # twelve checks, seconds, no download
 ```
+
+The paper reports 96.87% retain accuracy and 10.00% forget accuracy for the
+default setting, so those are the numbers to check against.
 
 ## What is where
 
@@ -97,19 +104,21 @@ one is not.
 
 | Here | Paper |
 | --- | --- |
-| 4-layer CNN, 20k weights | ResNet18 or ResNet50 |
-| No normalization layers | BatchNorm, which needs per-task running statistics |
 | Kaiming init with output scaling | Hyperfan initialization |
-| 3 tasks, 4 requests | Up to 20 tasks, 30 requests |
+| Constant learning rate | Adam with a scheduler, unspecified |
+| Permuted-MNIST only | Also 5-Tasks, CIFAR-100, Tiny-ImageNet |
 
-The mechanism is the same. The scale is not, so treat the numbers here as a
-demonstration that it works, not as a reproduction of the paper's results.
+Everything else follows the paper: ResNet18 or ResNet50 generated in 200
+chunks, 32-number task and chunk codes, one head per parameter type, per-task
+BatchNorm statistics, beta 0.1, gamma 0.01, 10 noise samples, and a burn-in of
+100 annealed by 10% per unlearn down to a floor of 20.
 
-Two things that are the paper's design, not ours, in case the notebook's
-assumptions table suggests otherwise. Appendix B specifies one output head per
-parameter type, which `uncle/hypernet.py` implements: batch normalization
-parameters, residual connection parameters, and ordinary weights. It also
-specifies that chunk codes are learned by backpropagation and then frozen
-after the first task. Our CNN target has no BatchNorm and no residual
-connections, so the split produces a single head here; give `HyperNetwork` a
-ResNet and it produces three.
+Two settings the paper leaves open, decided here: how the 200 chunks are
+shared between the heads (one each, then in proportion to size), and what
+happens to a forgotten task's BatchNorm statistics (nothing, since eq. 3
+covers generated parameters only).
+
+With ResNet18 the heads come out as 195 chunks for ordinary weights, 4 for
+residual connections and 1 for BatchNorm, and the hypernetwork is 56,082,990
+parameters generating 11,172,810. The `cnn` backbone has no BatchNorm and no
+residual connections, so it produces a single head.

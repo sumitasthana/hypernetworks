@@ -19,7 +19,7 @@ def run(config: Config, on_request: Callable[[dict], None] | None = None) -> lis
     torch.manual_seed(config.seed)
 
     tasks = build_tasks(config)
-    target = build_target(config.torch_device)
+    target = build_target(config)
     hypernet = HyperNetwork(target, config)
     uncle = UnCLe(hypernet, config, target, tasks)
 
@@ -36,9 +36,12 @@ def run(config: Config, on_request: Callable[[dict], None] | None = None) -> lis
 
         if action == "learn":
             losses = uncle.learn(task, protected)
+            burn_in = None
             seen.append(task)
         else:
-            losses = uncle.forget(task, protected)
+            # Appendix C anneals the burn-in by 10% after each unlearn.
+            burn_in = config.burn_in_for(len(forgotten))
+            losses = uncle.forget(task, protected, burn_in=burn_in)
             forgotten.append(task)
 
         record = {
@@ -50,6 +53,7 @@ def run(config: Config, on_request: Callable[[dict], None] | None = None) -> lis
             "seen": list(seen),
             "forgotten": list(forgotten),
             "final_loss": losses[-1],
+            "burn_in": burn_in,
         }
         history.append(record)
 

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import torch
 from torch import nn
+from torch.func import functional_call
 from torch.utils.data import Dataset
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -43,6 +44,7 @@ def build(**overrides):
     config = Config(
         tasks=("A", "B"),
         requests=(("learn", "A"), ("learn", "B"), ("forget", "A")),
+        backbone="cnn", chunks=32,
         epochs=25, batch_size=64, burn_in=150, device="cpu",
         **overrides,
     )
@@ -52,7 +54,7 @@ def build(**overrides):
         "A": {"train": Blocks(256, 0, 1), "test": Blocks(128, 0, 2)},
         "B": {"train": Blocks(256, 3, 3), "test": Blocks(128, 3, 4)},
     }
-    target = build_target(config.torch_device)
+    target = build_target(config)
     hypernet = HyperNetwork(target, config)
 
     return UnCLe(hypernet, config, target, tasks), hypernet, target
@@ -87,7 +89,10 @@ def test_generated_weights_fit_the_target():
 
 def test_heads_split_by_parameter_type():
     """Appendix B: one head for weights, one for BatchNorm, one for residuals."""
-    config = Config(tasks=("A",), requests=(("learn", "A"),), chunks=16, device="cpu")
+    config = Config(
+        tasks=("A",), requests=(("learn", "A"),),
+        backbone="cnn", chunks=16, device="cpu",
+    )
 
     resnet_shaped = nn.Sequential()
     resnet_shaped.add_module("conv", nn.Conv2d(1, 4, 3, padding=1, bias=False))
@@ -200,6 +205,69 @@ def test_metrics_match_the_paper_definitions():
     assert numbers["forget_accuracy"] == 14.0
     assert numbers["retain_accuracy"] == 81.0  # mean of B and C
     assert numbers["mean_spill"] == 2.0
+
+
+def test_burn_in_anneals():
+    """Appendix C: start at 100, drop 10% per unlearn, never below 20."""
+    config = Config(
+        tasks=("A",), requests=(("learn", "A"),), backbone="cnn", device="cpu",
+    )
+    assert config.burn_in_for(0) == 100
+    assert config.burn_in_for(1) == 90
+    assert config.burn_in_for(2) == 81
+    assert config.burn_in_for(50) == config.burn_in_min
+
+
+def test_sequences_parse_to_the_papers_requests():
+    from uncle.config import PERMUTED_MNIST_SEQUENCES, parse_sequence
+
+    requests = parse_sequence(PERMUTED_MNIST_SEQUENCES[1])
+    assert len(requests) == 15
+    assert requests[0] == ("learn", "1")
+    assert requests[2] == ("forget", "1")
+    assert sum(1 for action, _ in requests if action == "forget") == 5
+
+
+def test_resnet_target_keeps_buffers_per_task():
+    """BatchNorm statistics are not generated, so each task holds its own."""
+    config = Config(
+        tasks=("A", "B"), requests=(("learn", "A"), ("learn", "B")),
+        backbone="resnet18", chunks=200, epochs=1, batch_size=8, device="cpu",
+    )
+    target = build_target(config)
+
+    assert any("running_mean" in name for name, _ in target.named_buffers())
+
+    hypernet = HyperNetwork(config=config, target=target)
+    assert set(hypernet.heads) == {"weights", "batchnorm", "residual"}
+
+    uncle = UnCLe(hypernet, config, target, tasks=None)
+    assert uncle.buffer_template, "the template should hold ResNet's buffers"
+
+    # Generation has to cover every ResNet parameter, exactly once.
+    hypernet.add_task("A")
+    weights = hypernet.weights_for("A")
+    expected = dict(target.named_parameters())
+    assert set(weights) == set(expected)
+    for name, value in weights.items():
+        assert value.shape == expected[name].shape, name
+
+    # One real forward pass, with buffers supplied the way learn() does it.
+    uncle.task_buffers["A"] = {
+        name: value.clone() for name, value in uncle.buffer_template.items()
+    }
+    before = uncle.task_buffers["A"]["bn1.running_mean"].clone()
+
+    target.train()
+    scores = functional_call(
+        target, (weights, uncle.task_buffers["A"]),
+        (torch.randn(8, 1, 28, 28),), strict=True,
+    )
+
+    assert scores.shape == (8, 10)
+    assert torch.isfinite(scores).all()
+    # Train mode must have moved this task's statistics.
+    assert not torch.equal(before, uncle.task_buffers["A"]["bn1.running_mean"])
 
 
 def main():

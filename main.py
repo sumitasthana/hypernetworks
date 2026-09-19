@@ -1,12 +1,18 @@
 """Run one UnCLe experiment and print the paper's four numbers.
 
-    python main.py
-    python main.py --epochs 3 --chunks 64
+The defaults are the paper's Permuted-MNIST setting and need a GPU:
+
+    python main.py                          # ResNet18, 200 chunks, 15 requests
+
+For a quick check on a CPU, use the small stand-in network:
+
+    python main.py --backbone cnn --chunks 32 --epochs 1 --sequence 1
 """
 
 import argparse
 
 from uncle import Config, run, spill, summary
+from uncle.config import PERMUTED_MNIST_SEQUENCES, parse_sequence
 
 
 def show(record: dict) -> None:
@@ -16,7 +22,7 @@ def show(record: dict) -> None:
     )
 
     if record["action"] == "forget":
-        line += f"    spill={spill(record):5.2f}"
+        line += f"    spill={spill(record):6.2f}  burn-in={record['burn_in']}"
 
     print(line)
 
@@ -25,8 +31,13 @@ def parse_args() -> Config:
     defaults = Config()
     parser = argparse.ArgumentParser(description=__doc__)
 
+    parser.add_argument("--backbone", default=defaults.backbone,
+                        choices=("resnet18", "resnet50", "cnn"))
+    parser.add_argument("--sequence", type=int, default=1, choices=(1, 2, 3),
+                        help="Which request sequence from the paper's Table 4")
     parser.add_argument("--epochs", type=int, default=defaults.epochs)
     parser.add_argument("--chunks", type=int, default=defaults.chunks)
+    parser.add_argument("--batch-size", type=int, default=defaults.batch_size)
     parser.add_argument("--beta", type=float, default=defaults.beta)
     parser.add_argument("--gamma", type=float, default=defaults.gamma)
     parser.add_argument("--burn-in", type=int, default=defaults.burn_in)
@@ -35,8 +46,11 @@ def parse_args() -> Config:
 
     arguments = parser.parse_args()
     return Config(
+        requests=parse_sequence(PERMUTED_MNIST_SEQUENCES[arguments.sequence]),
+        backbone=arguments.backbone,
         epochs=arguments.epochs,
         chunks=arguments.chunks,
+        batch_size=arguments.batch_size,
         beta=arguments.beta,
         gamma=arguments.gamma,
         burn_in=arguments.burn_in,
@@ -47,8 +61,13 @@ def parse_args() -> Config:
 
 def main() -> None:
     config = parse_args()
-    print(f"device: {config.device}   requests: "
-          + " ".join(f"{action[0].upper()}{task}" for action, task in config.requests))
+
+    print(f"backbone: {config.backbone}   chunks: {config.chunks}   "
+          f"epochs: {config.epochs}   device: {config.device}")
+    print("requests: " + " ".join(
+        f"{action[0].upper()}{task}" for action, task in config.requests
+    ))
+    print()
 
     history = run(config, on_request=show)
     numbers = summary(history)

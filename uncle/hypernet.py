@@ -11,26 +11,39 @@ import math
 
 import torch
 from torch import nn
+from torchvision.models import resnet18, resnet50
 
 from .config import Config
 
 BATCHNORM = (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)
 
 
-def build_target(device: torch.device) -> nn.Module:
-    """The CNN whose weights get generated.
+def build_target(config: Config) -> nn.Module:
+    """The network whose weights get generated: F in the paper.
 
     It is never trained. Every forward pass receives a fresh set of weights, so
-    its own values are only a template for the shapes. The paper uses ResNet18
-    for Permuted-MNIST and ResNet50 elsewhere; this is a small stand-in so the
-    package runs on a CPU in a couple of minutes.
+    its own values are only a template for the shapes.
+
+    The paper uses ResNet18 for Permuted-MNIST and ResNet50 elsewhere. The
+    "cnn" option is a small stand-in for quick CPU runs; it has no BatchNorm,
+    so it also has no per-task running statistics to carry around.
     """
-    target = nn.Sequential(
-        nn.Conv2d(1, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
-        nn.Conv2d(16, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
-        nn.Flatten(), nn.Linear(32 * 7 * 7, 10),
-    )
-    return target.to(device).requires_grad_(False)
+    if config.backbone == "cnn":
+        target = nn.Sequential(
+            nn.Conv2d(1, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(16, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Flatten(), nn.Linear(32 * 7 * 7, 10),
+        )
+    else:
+        builder = {"resnet18": resnet18, "resnet50": resnet50}[config.backbone]
+        target = builder(weights=None, num_classes=10)
+
+        # Permuted-MNIST is one channel at 28x28. The stock 7x7 stride-2 stem
+        # with a max-pool would throw most of that away.
+        target.conv1 = nn.Conv2d(1, 64, 3, stride=1, padding=1, bias=False)
+        target.maxpool = nn.Identity()
+
+    return target.to(config.torch_device).requires_grad_(False)
 
 
 def parameter_group(module: nn.Module, module_name: str) -> str:
