@@ -155,6 +155,17 @@ class RequestLoopTests(unittest.TestCase):
             abs(forget["after"]["1"] - forget["before"]["1"]),
         )
 
+    def test_before_reuses_the_previous_after(self):
+        """Nothing touches the model between requests, so re-measuring is waste."""
+        config = small_config()
+        torch.manual_seed(config.seed)
+        history = run_experiment(config=config, max_images=300,
+                                 verbose=False, progress=False)["history"]
+
+        self.assertEqual(history[0]["before"], {})
+        for index in range(1, len(history)):
+            self.assertEqual(history[index]["before"], history[index - 1]["after"])
+
     def test_forgetting_stays_in_its_lane(self):
         config = small_config()
         torch.manual_seed(config.seed)

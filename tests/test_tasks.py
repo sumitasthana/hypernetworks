@@ -70,6 +70,31 @@ class TaskTests(unittest.TestCase):
                 load_partition(root, path)
 
 
+class IndexingTests(unittest.TestCase):
+    """Only the requested classes get indexed, and labels stay global."""
+
+    def setUp(self):
+        from uncle.tinyimagenet import DEFAULT_ROOT
+        if not DEFAULT_ROOT.exists():
+            self.skipTest(f"No dataset at {DEFAULT_ROOT}")
+
+    def test_a_subset_indexes_less_but_labels_do_not_move(self):
+        from uncle.tinyimagenet import TinyImageNet
+        everything = TinyImageNet(split="val")
+        few = TinyImageNet(split="val", classes=everything.classes[:10])
+
+        self.assertLess(len(few), len(everything))
+        self.assertEqual(len(few.indexed_classes), 10)
+        # Global numbering is unchanged, which is what ClassTask relies on.
+        self.assertEqual(few.class_to_idx, everything.class_to_idx)
+        self.assertEqual(set(few.targets), set(range(10)))
+
+    def test_unknown_classes_are_refused(self):
+        from uncle.tinyimagenet import TinyImageNet
+        with self.assertRaises(ValueError):
+            TinyImageNet(split="val", classes=["not-a-wnid"])
+
+
 class PrepareDataTests(unittest.TestCase):
     """A directory that exists but is incomplete still needs downloading."""
 

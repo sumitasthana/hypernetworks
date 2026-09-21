@@ -25,6 +25,7 @@ from `config`.
 import argparse
 import json
 from pathlib import Path
+import time
 
 from .config import Config, dataset_defaults
 from .experiment import run as run_requests
@@ -97,6 +98,7 @@ def run_experiment(sequence=1, limit_requests=None, max_images=None,
     # Only the tasks these requests mention, because building one indexes both
     # splits. A full sequence names all twenty anyway.
     needed = sorted({task for _, task in config.requests}, key=int)
+    setup_began = time.perf_counter()
     tasks = build_tasks(config, root=root, include=needed,
                         max_images=max_images, download=download)
 
@@ -116,6 +118,8 @@ def run_experiment(sequence=1, limit_requests=None, max_images=None,
     facts = {}
 
     def record_environment(built):
+        log.setup_seconds = time.perf_counter() - setup_began
+        log.start()
         facts.update(environment(config, built["hypernet"], built["tasks"]))
         if verbose:
             print(f"sequence {sequence}: {len(config.requests)} requests over "
@@ -133,6 +137,8 @@ def run_experiment(sequence=1, limit_requests=None, max_images=None,
 
     history = []
     bar = progress_bar(len(config.requests), f"sequence {sequence}", progress)
+    # Model construction happens inside run_requests, so close the setup clock
+    # from the on_start hook rather than here.
     log.start()
 
     def record_done(record):
@@ -203,7 +209,9 @@ def log_steps(config, tasks, task) -> int:
 
 def describe_costs(totals) -> str:
     """The cost summary as a few plain lines."""
-    lines = [f"total time       {totals['total_seconds'] / 60:.1f} min "
+    lines = [f"total time       {totals['total_seconds'] / 60:.1f} min, of which "
+             f"{totals['setup_seconds']:.0f}s was setup",
+             f"requests         {totals['request_seconds'] / 60:.1f} min "
              f"over {totals['requests']} requests"]
     for action in ("learn", "forget"):
         if action in totals:

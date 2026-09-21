@@ -60,7 +60,13 @@ class TinyImageNet(Dataset):
     The public test split has no labels, so it is deliberately not accepted.
     """
 
-    def __init__(self, root=DEFAULT_ROOT, split="train", transform=None):
+    def __init__(self, root=DEFAULT_ROOT, split="train", transform=None, classes=None):
+        """`classes` limits indexing to those WordNet IDs.
+
+        Labels stay global either way: `class_to_idx` always covers all 200, so
+        a subset indexes fewer images without renumbering anything. A run that
+        touches four tasks has no reason to walk the other 180 classes.
+        """
         if split not in ("train", "val"):
             raise ValueError("split must be 'train' or 'val'; test labels are unavailable")
         self.root = prepare_data(root)
@@ -77,8 +83,14 @@ class TinyImageNet(Dataset):
         self.class_names = [words.get(wnid, wnid) for wnid in self.classes]
         self.samples = []
 
+        wanted = set(self.classes if classes is None else classes)
+        unknown = wanted - set(self.classes)
+        if unknown:
+            raise ValueError(f"Not Tiny ImageNet classes: {sorted(unknown)}")
+        self.indexed_classes = [wnid for wnid in self.classes if wnid in wanted]
+
         if split == "train":
-            for wnid in self.classes:
+            for wnid in self.indexed_classes:
                 folder = self.root / "train" / wnid
                 # The official box file is also an image manifest. Prefer it to
                 # a directory scan, which can race with another loader moving files.
@@ -87,13 +99,17 @@ class TinyImageNet(Dataset):
                     names = sorted(line.split()[0] for line in manifest.read_text().splitlines() if line.strip())
                     if len(names) != len(set(names)):
                         raise ValueError(f"Duplicate training images in {manifest}")
-                    paths = [folder / "images" / name for name in names]
-                    paths = [p if p.is_file() else folder / p.name for p in paths]
-                    missing = next((p for p in paths if not p.is_file()
-                                    and not (folder / p.name).is_file()
-                                    and not (folder / "images" / p.name).is_file()), None)
-                    if missing is not None:
-                        raise FileNotFoundError(f"Missing training image: {missing}")
+                    # Probe the layout once per class instead of once per
+                    # image. Checking all 100,000 individually cost 220,000
+                    # filesystem calls and about nine seconds, and established
+                    # nothing that `image_path` does not recover from on
+                    # access, where the error is clearer anyway.
+                    nested = folder / "images"
+                    base = nested if (nested / names[0]).is_file() else folder
+                    if not (base / names[0]).is_file():
+                        raise FileNotFoundError(
+                            f"Missing training image: {folder / names[0]}")
+                    paths = [base / name for name in names]
                 else:
                     paths = sorted(folder.rglob("*.JPEG"))
                 if not paths:
@@ -104,6 +120,8 @@ class TinyImageNet(Dataset):
             seen = set()
             for line in annotations.read_text().splitlines():
                 filename, wnid, *_ = line.split("\t")
+                if wnid not in wanted:
+                    continue
                 if filename in seen:
                     raise ValueError(f"Duplicate validation image: {filename}")
                 seen.add(filename)
@@ -117,7 +135,7 @@ class TinyImageNet(Dataset):
                     raise FileNotFoundError(f"Missing validation image: {filename}")
                 self.samples.append((path, self.class_to_idx[wnid]))
         if not self.samples:
-            raise ValueError(f"Empty {split} split")
+            raise ValueError(f"Empty {split} split for {len(wanted)} classes")
         self.targets = [target for _, target in self.samples]
 
     def __len__(self):

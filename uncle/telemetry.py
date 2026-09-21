@@ -107,6 +107,7 @@ class RunLog:
 
     device: torch.device
     rows: list[dict] = field(default_factory=list)
+    setup_seconds: float = 0.0
     _mark: float = 0.0
     _began: float = 0.0
 
@@ -155,8 +156,14 @@ class RunLog:
 
     def totals(self) -> dict:
         """Per-action totals, plus the worst request, which is the binding one."""
+        requests = sum(row["seconds"] for row in self.rows)
         report = {
-            "total_seconds": sum(row["seconds"] for row in self.rows),
+            # Setup is dataset indexing and model construction, before the
+            # first request. It is counted because a silent wait before the
+            # bars appear is still time you spent.
+            "setup_seconds": self.setup_seconds,
+            "request_seconds": requests,
+            "total_seconds": self.setup_seconds + requests,
             "requests": len(self.rows),
         }
         for action in ("learn", "forget"):

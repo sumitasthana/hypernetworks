@@ -52,8 +52,11 @@ def build_tasks(config=None, root=DEFAULT_ROOT, partition_path=DEFAULT_PARTITION
         missing = wanted - {str(group["task_id"]) for group in groups}
         raise ValueError(f"The partition has no task named {sorted(missing)}")
 
+    # Only the classes these tasks name. Indexing all 200 to use 40 of them
+    # was the largest cost before the first optimizer step.
+    wnids = [wnid for group in groups for wnid in group["wnids"]]
     bases = {
-        slot: TinyImageNet(root, split, ToTensor())
+        slot: TinyImageNet(root, split, ToTensor(), classes=wnids)
         for slot, split in (("train", "train"), ("test", "val"))
     }
     return {

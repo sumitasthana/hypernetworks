@@ -40,6 +40,10 @@ class UnCLe:
         self.progress = progress
 
         # A clean set of running statistics for every new task to start from.
+        # Frozen reference weights for the protected tasks, rebuilt at the
+        # start of every request. See `preserve`.
+        self._reference: dict[str, dict[str, torch.Tensor]] = {}
+
         self.buffer_template: dict[str, torch.Tensor] = (
             {name: value.detach().clone() for name, value in target.named_buffers()}
             if target is not None
@@ -58,6 +62,12 @@ class UnCLe:
         forget from spilling onto its neighbours. Both operations pay it.
         Forgotten tasks stay on the protected list, which is what stops them
         coming back as later tasks are learned.
+
+        The snapshot and the protected tasks' codes are both frozen for the
+        length of a request, so each reference is generated once and kept
+        rather than regenerated every step. That halves the generator work
+        here, which is the dominant cost late in a sequence. It does hold one
+        parameter set per protected task in memory for the request.
         """
         if not protected:
             return torch.zeros((), device=self.device)
@@ -65,8 +75,11 @@ class UnCLe:
         total = torch.zeros((), device=self.device)
         for task in protected:
             code = self.hypernet.task_codes[task].detach()
-            with torch.no_grad():
-                before = snapshot.weights_from_code(code)
+            before = self._reference.get(task)
+            if before is None:
+                with torch.no_grad():
+                    before = snapshot.weights_from_code(code)
+                self._reference[task] = before
             now = self.hypernet.weights_from_code(code)
             total = total + sum(
                 (now[name] - before[name]).square().sum() for name in now
@@ -79,6 +92,7 @@ class UnCLe:
     def learn(self, task: str, protected: list[str]) -> list[float]:
         """Teach the hypernetwork to classify one task. Returns loss per epoch."""
         snapshot = self.hypernet.snapshot()
+        self._reference = {}
         code = self.hypernet.add_task(task)
 
         # This task's own running statistics, updated only by this loop.
@@ -165,6 +179,7 @@ class UnCLe:
         iterations = self.config.burn_in if burn_in is None else burn_in
 
         snapshot = self.hypernet.snapshot()
+        self._reference = {}
         trainable = self.hypernet.generator_parameters()
 
         self.hypernet.requires_grad_(False)

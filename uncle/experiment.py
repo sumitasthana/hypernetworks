@@ -47,8 +47,13 @@ def run(
     seen: list[str] = []
     forgotten: list[str] = []
 
+    previous: dict[str, float] = {}
+
     for index, (action, task) in enumerate(config.requests):
-        before = {name: uncle.accuracy(name) for name in seen}
+        # Nothing touches the model between requests, so the accuracies taken
+        # after the last one are still current. Measuring them again doubled
+        # the evaluation work for an identical answer.
+        before = previous if previous else {name: uncle.accuracy(name) for name in seen}
 
         # Every task met so far, except the one this request is about.
         # Forgotten tasks stay on the list, which is what stops them relapsing.
@@ -64,12 +69,15 @@ def run(
             losses = uncle.forget(task, protected, burn_in=burn_in)
             forgotten.append(task)
 
+        after = {name: uncle.accuracy(name) for name in seen}
+        previous = dict(after)
+
         record = {
             "index": index,
             "action": action,
             "task": task,
             "before": before,
-            "after": {name: uncle.accuracy(name) for name in seen},
+            "after": after,
             "seen": list(seen),
             "forgotten": list(forgotten),
             "final_loss": losses[-1],
