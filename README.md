@@ -206,3 +206,9 @@ With ResNet18 the heads come out as 195 chunks for ordinary weights, 4 for
 residual connections and 1 for BatchNorm, and the hypernetwork is 56,082,990
 parameters generating 11,172,810. The `cnn` backbone has no BatchNorm and no
 residual connections, so it produces a single head.
+
+## Citation
+
+Adhikari, Kumaravelu, and Srijith (2025), [An Unlearning Framework for Continual
+Learning](https://arxiv.org/abs/2509.17530). The BibTeX entry for the paper
+reimplemented here is in [references.bib](references.bib).
