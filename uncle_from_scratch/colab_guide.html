@@ -396,28 +396,32 @@ history, numbers = run_experiment(
   they were.</p>
 
 <div class="note warn">
-  <strong>Known problem with the <code>cnn</code> backbone: it does not learn.</strong> Measured on a
-  CPU, one task, 300 images, up to 400 optimizer steps. The first epoch's loss comes out around 6.7,
-  then it drops to 2.3026 and stays there to four decimal places. That number is ln(10): the network
-  is producing identical logits for every input, so every class gets probability 0.1. Accuracy sits
-  at exactly 10.0 and never moves.
+  <strong>Fixed: the classifier's initialization.</strong> If you ran this before 21 September 2025,
+  re-pull. The <code>cnn</code> backbone could not learn at all, and the ResNet runs were affected
+  more mildly.
   <br><br>
-  The cause is the initialization. The generated classifier weights start too large, the first
-  optimizer steps overshoot into that flat uniform-output basin, and Adam never climbs back out.
-  Shrinking just that one layer's output scale by 1/32 takes the same run to loss 1.77 and 17.7%
-  accuracy, which is what pins the diagnosis. This code uses Kaiming initialization with output
-  scaling where the paper uses Hyperfan initialization, and Hyperfan exists precisely to get the
-  generated network's scale right. The shortcut has a real cost.
+  What happened: the first epoch's loss came out near 6.7, then dropped to 2.3026 and stayed there to
+  four decimal places for as many epochs as it was given. That number is ln(10), the loss of a network
+  producing identical logits for every input, so every class gets probability 0.1 and accuracy sits at
+  exactly 10.0. The early Adam steps overshot into that flat basin and never climbed out.
   <br><br>
-  Plain backprop on the same 300 images reaches about 30%, so the data and the architecture are
-  fine. It is the generator's starting scale.
+  The cause was applying He initialization to the classifier. He is derived for a hidden layer feeding
+  a ReLU, where preserving the signal's scale is the point; on a layer whose outputs are logits it
+  makes them far too large. The generated weights were in fact correctly He-scaled, measured at
+  0.015625 against <code>sqrt(2/8192) = 0.015625</code>, so this was not a broken implementation of
+  the intended initialization. The intent was wrong for that one layer. The classifier now uses one
+  over fan-in, which starts the logits near zero.
   <br><br>
-  <strong>What to check in your own run.</strong> The ResNet backbones put batch normalization before
-  the classifier, which keeps the incoming features near unit scale, so the initial loss should be
-  nearer 2.5 than 6.7 and the collapse is much less likely. But confirm it rather than assume:
-  <code>epochs</code> worth of loss per learn request is the tell. If your first learn's
-  <code>final_loss</code> is 2.3026 and its accuracy is exactly 10.0, the same thing is happening to
-  you, and no amount of extra epochs will fix it.
+  This is worth knowing rather than just fixing, because it says something about where hypernetworks
+  are fragile. Plain backprop on the same 300 images reached about 30% throughout, and PyTorch's
+  default <code>Linear</code> initialization is roughly 2.4 times smaller than He, which is why the
+  direct baseline never hit this. The generated path had no such luck.
+  <br><br>
+  <strong>Check your earlier runs.</strong> If a learn request's <code>final_loss</code> is 2.3026 and
+  its accuracy is exactly 10.0, that run hit this and its numbers are not usable. ResNet puts batch
+  normalization before the classifier, which keeps the incoming features near unit scale, so those
+  runs were less likely to collapse outright, but the initialization still changed, so they are not
+  comparable with runs from after the fix.
 </div>
 
 <h2>Example 2: the paper's setting</h2>

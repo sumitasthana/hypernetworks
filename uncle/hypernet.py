@@ -67,6 +67,19 @@ def parameter_group(module: nn.Module, module_name: str) -> str:
     return "weights"
 
 
+def classifier_name(target: nn.Module) -> str | None:
+    """The name of the module that produces logits: the target's last Linear.
+
+    Finds `fc` on the ResNets and the final layer of the `cnn` stand-in, which
+    is all this needs to handle.
+    """
+    last = None
+    for name, module in target.named_modules():
+        if isinstance(module, nn.Linear):
+            last = name
+    return last
+
+
 def allocate_chunks(sizes: dict[str, int], chunks: int) -> dict[str, int]:
     """Share the chunk budget across the heads.
 
@@ -109,9 +122,21 @@ class HyperNetwork(nn.Module):
         # to shrink it. The shrink factors turn unit-spread raw numbers into a
         # textbook He initialization, so the generated network starts out
         # correctly scaled.
+        #
+        # The classifier is the exception, and it has to be. He is derived for
+        # a hidden layer feeding a ReLU, where preserving the signal's scale is
+        # the point. The last layer's outputs are logits, and He there gives
+        # them a spread of about sqrt(2 x feature scale), which on the
+        # normalization-free `cnn` stand-in means a first-epoch loss near 6.7
+        # against ln(10) = 2.30. The early Adam steps overshoot, every input
+        # ends up with identical logits, and the loss then sits at ln(10)
+        # forever. One over fan-in instead starts the logits near zero, so
+        # every class begins at equal probability with gradients that still
+        # carry the labels' signal.
         self.layout: dict[str, tuple[str, int, torch.Size]] = {}
         self.scales: dict[str, float] = {}
         sizes: dict[str, int] = {}
+        self.classifier = classifier_name(target)
 
         for name, parameter in target.named_parameters():
             module_name = name.rpartition(".")[0]
@@ -122,7 +147,12 @@ class HyperNetwork(nn.Module):
             sizes[group] = start + parameter.numel()
 
             fan_in = parameter[0].numel() if parameter.dim() > 1 else 1
-            self.scales[name] = (2 / fan_in) ** 0.5 if parameter.dim() > 1 else 0.01
+            if parameter.dim() == 1:
+                self.scales[name] = 0.01
+            elif module_name == self.classifier:
+                self.scales[name] = 1 / fan_in
+            else:
+                self.scales[name] = (2 / fan_in) ** 0.5
 
         self.group_sizes = sizes
         self.group_order = list(sizes)

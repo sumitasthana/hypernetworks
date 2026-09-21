@@ -122,6 +122,24 @@ class RequestLoopTests(unittest.TestCase):
         self.assertLessEqual(numbers["mean_spill"], 5.0,
                              "forgetting task 0 moved task 1 too much")
 
+    def test_learning_actually_moves_off_chance(self):
+        """The check that the classifier's output scale exists to make possible.
+
+        With He initialization on the classifier this could not pass: the loss
+        pinned to ln(10) = 2.3026 and accuracy to exactly 10.0, however many
+        epochs it was given. Twenty epochs on 300 images is a small budget, so
+        the bar is the loss falling clearly below ln(10) rather than a
+        particular accuracy, which is still noisy at this scale.
+        """
+        config = small_config(requests=parse_sequence("L0"), tasks=("0",), epochs=20)
+        torch.manual_seed(config.seed)
+        history, _ = run_experiment(config=config, max_images=300, verbose=False)
+
+        self.assertLess(history[0]["final_loss"], 2.0,
+                        "training loss never fell below chance-level cross-entropy")
+        self.assertGreater(history[0]["after"]["0"], CHANCE,
+                           "learning task 0 did not beat chance")
+
 
 @unittest.skipUnless(DEFAULT_ROOT.exists(), f"No dataset at {DEFAULT_ROOT}")
 class ForgetMechanismTests(unittest.TestCase):

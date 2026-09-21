@@ -177,9 +177,10 @@ Run the end-to-end check with:
 python hypernetwork/uncle_from_scratch/test_run.py
 ```
 
-It learns two tasks and forgets one on a few hundred images, and asserts that
-learning beats chance, forgetting returns to chance, and the other task
-survives. No training results are claimed at this stage.
+Nine checks, about two minutes on a CPU. They cover the request loop and its
+records, the metrics matching those records, capping keeping every class,
+forgetting measured as the collapse of the generated weights, and learning
+getting off chance. No training results are claimed at this stage.
 
 Task IDs here are not comparable with `../uncle`. That package cuts sorted
 WordNet IDs into consecutive blocks; `tasks.py` shuffles them with seed 42

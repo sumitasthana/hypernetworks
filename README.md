@@ -143,7 +143,7 @@ one is not.
 
 | Here | Paper |
 | --- | --- |
-| Kaiming init with output scaling | Hyperfan initialization |
+| Kaiming init with output scaling, and 1/fan-in on the classifier | Hyperfan initialization |
 | Constant learning rate | Adam with a scheduler, unspecified |
 | Permuted MNIST and Tiny ImageNet | Also 5-Tasks and CIFAR-100 |
 
@@ -151,6 +151,16 @@ Everything else follows the paper: ResNet18 or ResNet50 generated in 200
 chunks, 32-number task and chunk codes, one head per parameter type, per-task
 BatchNorm statistics, beta 0.1, gamma 0.01, 10 noise samples, and a burn-in of
 100 annealed by 10% per unlearn down to a floor of 20.
+
+The classifier is scaled by one over fan-in rather than He's square root of two
+over fan-in. He is derived for a hidden layer feeding a ReLU; on a layer whose
+outputs are logits it makes them too large. With He there, the `cnn` backbone
+could not learn at all: first-epoch loss near 6.7, then pinned at ln(10) =
+2.3026 with accuracy at exactly 10.0 for as many epochs as it was given, because
+the early Adam steps overshoot into producing identical logits for every input
+and never climb back out. One over fan-in starts the logits near zero instead.
+This also changes the ResNet runs, where the effect was milder because batch
+normalization keeps the features entering the classifier near unit scale.
 
 Three settings the paper leaves open, decided here: how the 200 chunks are
 shared between the heads (one each, then in proportion to size), what happens
