@@ -16,24 +16,15 @@ From a notebook:
 import argparse
 import json
 from pathlib import Path
-import sys
-
-# Both this folder and the repository root, so the flat imports below and the
-# `uncle` package both resolve wherever the caller started from.
-_HERE = Path(__file__).resolve().parent
-for _path in (str(_HERE), str(_HERE.parent)):
-    if _path not in sys.path:
-        sys.path.insert(0, _path)
 
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
-from uncle.config import Config, dataset_defaults
-from uncle.hypernet import build_target
-
-from data import DEFAULT_ROOT
-from streams import build_tasks
+from .config import Config, dataset_defaults
+from .hypernet import build_target
+from .streams import build_tasks
+from .tinyimagenet import DEFAULT_ROOT
 
 
 def evaluate(network, loader, device) -> float:
@@ -144,7 +135,7 @@ def main():
     parser.add_argument("--download", action="store_true")
     parser.add_argument("--device", default=None)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--output", type=Path, default=_HERE / "outputs" / "baseline")
+    parser.add_argument("--output", type=Path, default=Path("outputs") / "baseline")
     args = parser.parse_args()
 
     overrides = {"device": args.device} if args.device else {}

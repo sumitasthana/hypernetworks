@@ -10,11 +10,11 @@ What it does NOT assert is that learning beats chance. At this scale, with the
 collapse the network to identical logits for every input, and it stays there.
 Shrinking that one layer's output scale fixes it, which points at the
 initialization, the one place this code knowingly departs from the paper. See
-`colab_guide.html`. Until that is settled, an accuracy assertion here would
+`docs/colab_guide.html`. Until that is settled, an accuracy assertion here would
 either fail or lock in the broken behaviour, so this file tests the parts that
 are true and reliable: the plumbing, and what forgetting does to the weights.
 
-`baseline.py` covers the other half of the question. Plain backprop on the same
+`uncle/baseline.py` covers the other half of the question. Plain backprop on the same
 300 images reaches about 30%, so the architecture and the data are fine.
 """
 
@@ -22,10 +22,7 @@ from pathlib import Path
 import sys
 import unittest
 
-_HERE = Path(__file__).resolve().parent
-for _path in (str(_HERE), str(_HERE.parent)):
-    if _path not in sys.path:
-        sys.path.insert(0, _path)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import torch
 
@@ -33,9 +30,10 @@ from uncle.config import Config, parse_sequence
 from uncle.hypernet import HyperNetwork, build_target
 from uncle.trainer import UnCLe
 
-from data import DEFAULT_ROOT
-from run import make_config, run_experiment
-from streams import build_tasks
+from uncle.experiments import describe_costs, make_config, run_experiment
+from uncle.telemetry import RunLog, environment
+from uncle.streams import build_tasks
+from uncle.tinyimagenet import DEFAULT_ROOT
 
 CHANCE = 10.0
 
@@ -72,6 +70,44 @@ class ConfigTests(unittest.TestCase):
             run_experiment(config=small_config(), epochs=3)
 
 
+class TelemetryTests(unittest.TestCase):
+    """The cost log, on made-up rows, so this needs no GPU and no training."""
+
+    def rows(self):
+        log = RunLog(device=torch.device("cpu"))
+        log.start()
+        for index, (action, task) in enumerate([("learn", "0"), ("learn", "1"),
+                                                ("forget", "0")]):
+            log.measure({"index": index, "action": action, "task": task,
+                         "seen": ["0", "1"][:index + 1]},
+                        steps=40 if action == "learn" else 100)
+        return log
+
+    def test_totals_separate_learning_from_forgetting(self):
+        totals = self.rows().totals()
+        self.assertEqual(totals["requests"], 3)
+        self.assertEqual(totals["learn"]["requests"], 2)
+        self.assertEqual(totals["forget"]["requests"], 1)
+        self.assertGreaterEqual(totals["learn"]["slowest_seconds"],
+                                totals["learn"]["mean_seconds"])
+        # No GPU here, so there is no peak memory to report.
+        self.assertNotIn("peak_memory_bytes", totals)
+
+    def test_the_printed_forms_hold_together(self):
+        log = self.rows()
+        table = log.table()
+        self.assertEqual(len(table.splitlines()), 5)     # header, rule, three rows
+        self.assertIn("forget", table)
+        self.assertIn("total time", describe_costs(log.totals()))
+
+    def test_environment_records_what_a_number_needs_to_be_traced(self):
+        facts = environment(small_config())
+        for key in ("torch", "device", "config", "platform"):
+            self.assertIn(key, facts)
+        self.assertEqual(facts["config"]["backbone"], "cnn")
+        self.assertEqual(facts["config"]["chunks"], 8)
+
+
 @unittest.skipUnless(DEFAULT_ROOT.exists(), f"No dataset at {DEFAULT_ROOT}")
 class StreamTests(unittest.TestCase):
     def test_capping_keeps_every_class(self):
@@ -91,7 +127,9 @@ class RequestLoopTests(unittest.TestCase):
     def test_records_and_metrics_line_up(self):
         config = small_config()
         torch.manual_seed(config.seed)
-        history, numbers = run_experiment(config=config, max_images=300, verbose=False)
+        result = run_experiment(config=config, max_images=300,
+                                verbose=False, progress=False)
+        history, numbers = result["history"], result["numbers"]
 
         self.assertEqual([r["action"] for r in history], ["learn", "learn", "forget"])
         self.assertEqual(history[0]["seen"], ["0"])
@@ -115,7 +153,9 @@ class RequestLoopTests(unittest.TestCase):
     def test_forgetting_stays_in_its_lane(self):
         config = small_config()
         torch.manual_seed(config.seed)
-        history, numbers = run_experiment(config=config, max_images=300, verbose=False)
+        result = run_experiment(config=config, max_images=300,
+                                verbose=False, progress=False)
+        history, numbers = result["history"], result["numbers"]
 
         self.assertLessEqual(history[2]["after"]["0"], CHANCE + 2.0,
                              "task 0 should sit at chance once forgotten")
@@ -133,7 +173,8 @@ class RequestLoopTests(unittest.TestCase):
         """
         config = small_config(requests=parse_sequence("L0"), tasks=("0",), epochs=20)
         torch.manual_seed(config.seed)
-        history, _ = run_experiment(config=config, max_images=300, verbose=False)
+        history = run_experiment(config=config, max_images=300,
+                                 verbose=False, progress=False)["history"]
 
         self.assertLess(history[0]["final_loss"], 2.0,
                         "training loss never fell below chance-level cross-entropy")

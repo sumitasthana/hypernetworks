@@ -24,6 +24,8 @@ For a quick check without a GPU, swap in the small stand-in network:
 ```bash
 python main.py --backbone cnn --chunks 32 --epochs 1
 python tests/test_uncle.py         # fourteen checks, seconds, no download
+python tests/test_tasks.py         # three checks on the class partition
+python tests/test_experiments.py   # twelve checks, a couple of minutes, needs the images
 ```
 
 Tiny ImageNet downloads itself on first use (about 240 MB) and wants a GPU. It
@@ -39,63 +41,75 @@ default setting, so those are the numbers to check against.
 
 ## What is where
 
-| File | What it holds |
+| Path | What it holds |
 | --- | --- |
 | `uncle/config.py` | Every knob, plus validation of the request list |
-| `uncle/data.py` | Permuted MNIST and Tiny ImageNet task streams |
-| `uncle/hypernet.py` | The target CNN and the network that generates its weights |
+| `uncle/data.py` | Permuted MNIST, and the route to Tiny ImageNet |
+| `uncle/tinyimagenet.py` | The Tiny ImageNet reader, which never moves a file |
+| `uncle/tasks.py` | The saved 20 x 10 class partition and task-local labels |
+| `uncle/streams.py` | Those tasks, in the shape the trainer wants |
+| `uncle/hypernet.py` | The target network and the network that generates its weights |
 | `uncle/trainer.py` | `learn`, `forget`, and the regularizer they share |
 | `uncle/metrics.py` | Retain accuracy, forget accuracy, spill, relapse |
 | `uncle/experiment.py` | Works through a request sequence, returns records |
-| `main.py` | Command line entry point and printing |
-| `uncle_minimal.py` | The same method in one flat file, for reading |
-| `uncle_from_scratch/` | A separate rebuild, data first, reusing this package |
-| `Scalable_Hypernetworks_...ipynb` | Colab notebook, a scaled-up run in progress |
+| `uncle/experiments.py` | The callable front door: one run, or a sweep of them |
+| `uncle/telemetry.py` | What a run cost: time, peak GPU memory, sizes |
+| `uncle/baseline.py` | One task, ordinary backprop, no hypernetwork |
+| `main.py` | Command line for Permuted MNIST and Tiny ImageNet |
+| `scripts/` | `run.py`, `baseline.py`, and the dataset exploration scripts |
+| `notebooks/` | Dataset and task exploration, plus the original Colab notebook |
+| `docs/colab_guide.html` | How to run all of this on a Colab GPU |
+| `reference/uncle_minimal.py` | The same method in one flat file, for reading |
+| `tests/` | `test_uncle.py`, `test_tasks.py`, `test_experiments.py` |
 
-`uncle_minimal.py` is not imported by anything. It exists so the method can be
+`reference/uncle_minimal.py` is not imported by anything. It exists so the method can be
 read top to bottom in one sitting before meeting the package.
 
-## The rebuild next door
+## Running it from Python
 
-`uncle_from_scratch/` works up to the same method in stages, starting from the
-data rather than the method, so each piece can be checked before the next one
-lands. It has its own Tiny ImageNet loader and its own task partition: 200
-WordNet IDs shuffled with seed 42 into 20 groups of ten, saved to a file and
-verified on every run.
-
-It does not reimplement the method. The hypernetwork, the learn and forget
-operations, the four metrics and the Table 4 sequences all come from this
-package. Three modules join the two, and they are libraries first because the
-real runs happen on a Colab GPU:
+`main.py` is the older command line and still works. The callable front door,
+which is what Colab wants, is this:
 
 ```python
-import sys
-sys.path.insert(0, "uncle_from_scratch")
+from uncle.experiments import run_experiment, run_sequences
 
-from run import run_experiment
-history, numbers = run_experiment(sequence=1, backbone="resnet50", epochs=5)
+result = run_experiment(sequence=1, backbone="resnet50", epochs=5)
+print(result["numbers"])     # retain, forget, spill, relapse
+print(result["totals"])      # seconds per action, peak GPU memory
 ```
 
 Any `Config` field passes through as a keyword argument, so a sweep is a loop
-over calls. `uncle_from_scratch/colab_guide.html` is the Colab walkthrough:
-nine cells and five worked examples. `uncle_from_scratch/README.md` has the
-rest.
-
-Task IDs are not comparable between the two. `uncle/data.py` cuts sorted
-WordNet IDs into consecutive blocks; the rebuild shuffles them first. Task 3 is
-ten different classes in each, so name the partition whenever you compare.
-
-## Use it from your own code
+over calls. All three of the paper's sequences over three seeds, with a
+progress bar and a comparison table at the end:
 
 ```python
-from uncle import Config, run, summary
-
-history = run(Config(epochs=3, requests=(("learn", "A"), ("learn", "B"), ("forget", "A"))))
-print(summary(history))
+results = run_sequences(sequences=(1, 2, 3), seeds=(0, 1, 2),
+                        backbone="resnet50", epochs=5, output="results")
 ```
 
-`run` takes an optional `on_request` callback, called with each record as it
-completes, so you can log or plot without changing the library.
+Or from the command line:
+
+```bash
+python scripts/run.py --sequence 1 2 3 --seed 0 1 2 --backbone resnet50
+```
+
+Each run writes four JSON files named after the sequence, backbone and seed:
+the history, the four numbers, the per-request costs, and the environment it
+ran in, down to the git commit. The history and the costs are rewritten after
+every request, so a long run can be watched and survives a crash.
+
+`docs/colab_guide.html` is the walkthrough: setup cells, worked examples, and
+every experiment in the paper with what to look for.
+
+## What a run costs
+
+`uncle/telemetry.py` times each request and records peak GPU memory around it,
+because learning and forgetting are very different jobs and averaging them
+hides that. A finished run prints a table of both, per request, plus totals.
+
+Peak memory is the number to watch on a long sequence. The regularizer
+regenerates every protected task's weights inside one graph, so a request near
+the end of a 30-request sequence is holding many times what the first one did.
 
 ## The four numbers
 
@@ -171,22 +185,22 @@ generated parameters only), and which Tiny ImageNet classes form each task.
 
 The paper says 10 tasks of 10 classes each, and 20 tasks of 10 classes for the
 long 30-request run. It never says which classes go together or in what order,
-so that is a knob here rather than a claim:
+so this had to be decided rather than read off.
 
-```bash
-python main.py --dataset tiny_imagenet --class-order sorted   # default
-python main.py --dataset tiny_imagenet --class-order random   # uses --seed
-```
+The grouping lives in `uncle/task_partition.json`: the 200 WordNet IDs sorted,
+then shuffled with NumPy PCG64 at seed 42, then cut into 20 disjoint groups of
+ten. The file is written once and checked on every run, so a partition that
+disagrees with it is an error rather than a silent change. The order inside a
+group fixes the local labels 0 to 9.
 
-`sorted` cuts the 200 wnids into consecutive blocks of ten in alphabetical
-order, so task 0 is classes 0-9. `random` shuffles them first. The groups are
-always disjoint. Twenty tasks covers all 200 classes; drop to ten tasks in
-`Config` and only the first 100 are used.
+Twenty tasks covers all 200 classes. All three of Table 4's Tiny-ImageNet
+request sequences are in `uncle/config.py`: 30 requests each over tasks 0-19.
+`--sequence` picks the row, and the task count and beta follow the dataset, so
+`--dataset tiny_imagenet` gives 20 tasks and beta 0.01 without any other flag.
 
-All three of Table 4's Tiny-ImageNet request sequences are in
-`uncle/config.py`: 30 requests each over tasks 0-19. `--sequence` picks the
-row, and the task count and beta follow the dataset, so `--dataset
-tiny_imagenet` gives 20 tasks and beta 0.01 without any other flag.
+There used to be a second Tiny ImageNet loader with a different grouping, which
+meant task 3 named different classes depending on which one you went through.
+There is now one, and `uncle/data.py` routes to it.
 
 With ResNet18 the heads come out as 195 chunks for ordinary weights, 4 for
 residual connections and 1 for BatchNorm, and the hypernetwork is 56,082,990

@@ -17,7 +17,6 @@ from torch.utils.data import Dataset
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from uncle import Config, HyperNetwork, UnCLe, build_target  # noqa: E402
-from uncle.data import _class_groups  # noqa: E402
 from uncle.metrics import relapse, spill, summary  # noqa: E402
 
 
@@ -303,39 +302,16 @@ def test_resnet_target_keeps_buffers_per_task():
     assert not torch.equal(before, uncle.task_buffers["A"]["bn1.running_mean"])
 
 
-def test_tiny_imagenet_split_is_disjoint_and_follows_the_rule():
-    """No image belongs to two tasks, and the split rule is the knob it claims."""
-    config = Config(dataset="tiny_imagenet", device="cpu",
-                    requests=(("learn", "0"),))
+def test_tiny_imagenet_tasks_come_from_the_saved_partition():
+    """One loader, one grouping. The partition itself is tested in test_tasks.py."""
+    from uncle.data import build_tasks
+    from uncle.streams import build_tasks as build_from_partition
 
-    sorted_groups = _class_groups(200, config)
-    assert len(sorted_groups) == 10
-    assert all(len(group) == 10 for group in sorted_groups)
-    assert sorted_groups[0] == list(range(10))
-    assert sorted_groups[9] == list(range(90, 100))
-
-    flat = [index for group in sorted_groups for index in group]
-    assert len(set(flat)) == len(flat)
-
-    shuffled = _class_groups(200, Config(dataset="tiny_imagenet", device="cpu",
-                                         class_order="random",
-                                         requests=(("learn", "0"),)))
-    assert shuffled != sorted_groups
-    assert len({index for group in shuffled for index in group}) == 100
-
-    # The paper's long-sequence run: 20 tasks covering all 200 classes.
-    wide = Config(dataset="tiny_imagenet", device="cpu",
-                  tasks=tuple(str(index) for index in range(20)),
-                  requests=(("learn", "17"),))
-    assert len({index for group in _class_groups(200, wide) for index in group}) == 200
-
-    # Asking for more classes than exist has to fail loudly, not silently drop tasks.
-    try:
-        _class_groups(50, config)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("a too-small dataset should raise")
+    # data.build_tasks is a router now, not a second implementation.
+    assert build_tasks.__module__ == "uncle.data"
+    assert build_from_partition.__module__ == "uncle.streams"
+    assert not hasattr(sys.modules["uncle.data"], "_class_groups")
+    assert not hasattr(sys.modules["uncle.data"], "_fetch_tiny_imagenet")
 
 
 def main():

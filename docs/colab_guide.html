@@ -288,7 +288,7 @@
 
 <header class="top">
   <div class="wrap">
-    <p class="eyebrow">uncle_from_scratch</p>
+    <p class="eyebrow">uncle</p>
     <h1>Running UnCLe on Colab</h1>
     <p class="lede">How to run it, then what the paper actually measured and how to reproduce each
       piece. The tasks come from this folder; the hypernetwork, the <span class="is-learn">learn</span>
@@ -314,7 +314,7 @@
   <figure class="code"><pre><code>!git clone -q https://github.com/sumitasthana/hypernetworks /content/hypernetworks
 
 import sys
-sys.path.insert(0, "/content/hypernetworks/uncle_from_scratch")</code></pre></figure>
+sys.path.insert(0, "/content/hypernetworks")</code></pre></figure>
 </div>
 
 <div class="note">
@@ -325,13 +325,13 @@ sys.path.insert(0, "/content/hypernetworks/uncle_from_scratch")</code></pre></fi
 
 <div class="note warn">
   <strong>Two ways the import goes wrong.</strong> The callable lives in
-  <code>uncle_from_scratch/run.py</code>, so it is <code>from run import run_experiment</code>.
+  <code>uncle/experiments.py</code>, so it is <code>from uncle.experiments import run_experiment</code>.
   <code>uncle.experiment</code> is the package next door: it holds <code>run</code>, which takes a
   finished <code>Config</code>, and importing <code>run_experiment</code> from it fails. And the path
-  you add is the <code>uncle_from_scratch</code> folder, not the repository root; <code>run.py</code>
+  you add is the <code>hypernetworks</code> repository root, not the repository root; <code>run.py</code>
   adds the root itself when it is imported, which is how <code>uncle</code> resolves.
   <br><br>
-  If <code>uncle_from_scratch</code> is missing from the clone, the clone predates it:
+  If <code>uncle</code> is missing from the clone, the clone predates it:
   <code>!git -C /content/hypernetworks pull</code>, then <strong>Runtime &rarr; Restart session</strong>.
   A pull on its own is not enough once a cell has imported anything, because Python keeps the old
   modules in memory, and the stale <code>uncle.experiment.run</code> has no <code>tasks</code>
@@ -369,9 +369,9 @@ SAVE = "/content/drive/MyDrive/uncle/results"</code></pre></figure>
 
 <div class="cell">
   <div class="cell-head"><span class="cell-num">4</span><span class="cell-note">minutes</span></div>
-  <figure class="code"><pre><code>from run import run_experiment
+  <figure class="code"><pre><code>from uncle.experiments import run_experiment
 
-history, numbers = run_experiment(
+result = run_experiment(
     sequence=1,
     backbone="cnn",
     chunks=32,
@@ -431,7 +431,7 @@ history, numbers = run_experiment(
 
 <div class="cell">
   <div class="cell-head"><span class="cell-num">5</span><span class="cell-note">hours</span></div>
-  <figure class="code"><pre><code>history, numbers = run_experiment(
+  <figure class="code"><pre><code>result = run_experiment(
     sequence=1,           # rows 1, 2 and 3 are the paper's Table 4
     backbone="resnet50",
     chunks=200,
@@ -440,7 +440,8 @@ history, numbers = run_experiment(
     output=SAVE,          # history_seq1_resnet50_seed0.json, rewritten each request
 )
 
-print(numbers["retain_accuracy"], numbers["forget_accuracy"])</code></pre></figure>
+print(result["numbers"])      # the four numbers
+print(result["totals"])       # seconds per action, peak GPU memory</code></pre></figure>
 </div>
 
 <div class="note warn">
@@ -458,11 +459,11 @@ print(numbers["retain_accuracy"], numbers["forget_accuracy"])</code></pre></figu
   <div class="cell-head"><span class="cell-num">6</span><span>gamma: how hard forgetting pushes</span></div>
   <figure class="code"><pre><code>results = {}
 for gamma in (0.001, 0.01, 0.1, 1.0):
-    _, results[gamma] = run_experiment(
+    results[gamma] = run_experiment(
         sequence=1, backbone="resnet18", chunks=64, epochs=2,
         limit_requests=10, root=DATA,
         gamma=gamma, output=None, verbose=False,
-    )
+    )["numbers"]
 
 for gamma, n in results.items():
     print(f"gamma={gamma:&lt;6} RA={n['retain_accuracy']:.2f}  "
@@ -497,7 +498,7 @@ def draw(record):
     plt.axhline(10, ls=":", c="grey", label="chance")
     plt.xlabel("request"); plt.ylabel("accuracy %"); plt.legend(); plt.show()
 
-history, numbers = run_experiment(
+run_experiment(
     sequence=1, backbone="resnet18", chunks=64, epochs=3,
     root=DATA, output=SAVE, on_request=draw, verbose=False,
 )</code></pre></figure>
@@ -510,7 +511,7 @@ history, numbers = run_experiment(
 
 <div class="cell">
   <div class="cell-head"><span class="cell-num">8</span><span>can the architecture learn one task at all?</span></div>
-  <figure class="code"><pre><code>from baseline import run_baseline
+  <figure class="code"><pre><code>from uncle.baseline import run_baseline
 
 report = run_baseline(task=1, backbone="resnet18", epochs=10, root=DATA)
 print(report["best_validation_accuracy"], "vs chance", report["chance_accuracy"])</code></pre></figure>
@@ -521,14 +522,14 @@ print(report["best_validation_accuracy"], "vs chance", report["chance_accuracy"]
 
 <div class="cell">
   <div class="cell-head"><span class="cell-num">9</span><span>look before you spend</span></div>
-  <figure class="code"><pre><code>from run import make_config
-from dataclasses import replace
+  <figure class="code"><pre><code>from dataclasses import replace
+from uncle.experiments import make_config
 
 config = make_config(sequence=2, backbone="resnet50", epochs=5)
 print(config)                      # every knob, including the 30 requests
 
 config = replace(config, epochs=3) # Config is frozen, so replace() rather than assign
-history, numbers = run_experiment(config=config, root=DATA, output=SAVE)</code></pre></figure>
+result = run_experiment(config=config, root=DATA, output=SAVE)</code></pre></figure>
 </div>
 
 <div class="note">
@@ -536,6 +537,76 @@ history, numbers = run_experiment(config=config, root=DATA, output=SAVE)</code><
   <code>epochs=3</code>, never both. Mixing them raises rather than silently ignoring half of what you
   asked for.
 </div>
+
+<h2>Example 6: all three sequences, and what they cost</h2>
+<p><code>run_sequences</code> is the loop the paper's tables are made of: sequence 1 over three seeds
+  for Table 1, all three sequences for the generalization check. One progress bar per run, one for
+  the set, and a comparison table at the end.</p>
+
+<div class="cell">
+  <div class="cell-head"><span class="cell-num">10</span><span class="cell-note">many hours, budget it</span></div>
+  <figure class="code"><pre><code>from uncle.experiments import run_sequences
+
+results = run_sequences(
+    sequences=(1, 2, 3),
+    seeds=(0, 1, 2),
+    backbone="resnet50",
+    epochs=5,
+    root=DATA,
+    output=SAVE,
+    verbose=False,      # the bars stay readable without the per-request lines
+)</code></pre></figure>
+</div>
+
+<p>That is nine full runs. Start with <code>sequences=(1,)</code>, <code>seeds=(0,)</code> and
+  <code>limit_requests=3</code> to see the shape of the output and get a per-request cost, then
+  multiply before committing to the rest.</p>
+
+<h2>What a run costs</h2>
+<p>Every request is timed, and on a GPU its peak memory is recorded around it. Learning and
+  forgetting are very different jobs, so they are reported separately rather than averaged into one
+  meaningless number. A finished run prints this:</p>
+
+<figure class="code"><pre><code>  #  action  task prot  steps   seconds  s/step  peak GiB
+-----------------------------------------------------------
+  0  learn      3    0    390     181.4   0.465      4.21
+  1  learn      0    1    390     214.7   0.551      5.83
+  2  forget     3    1    100      38.2   0.382      5.86
+
+total time       7.2 min over 3 requests
+learn requests    2    6.6 min total,  198.1 s mean,  214.7 s slowest
+forget requests   1    0.6 min total,   38.2 s mean,   38.2 s slowest
+peak GPU memory  5.86 GiB
+GPU time         0.12 hours</code></pre></figure>
+
+<p>The numbers above are made up to show the layout, not measured. The columns that matter:</p>
+
+<ul class="plain">
+  <li><strong>prot</strong> is how many tasks the regularizer had to protect during that request.
+    This is the column that explains the other two. Every protected task gets its weights regenerated
+    inside the same graph, so both time and memory climb as the sequence goes on.</li>
+  <li><strong>s/step</strong> makes learn and forget comparable. A learn step walks a batch of images
+    through the generated network; a forget step touches no data at all. If a forget step is not
+    clearly cheaper than a learn step, the regularizer is the cost, not the objective.</li>
+  <li><strong>peak GiB</strong> is what decides whether request 29 survives. Watch whether it grows
+    linearly with <strong>prot</strong>, which is the behaviour to expect.</li>
+</ul>
+
+<p>It is all in the returned dict and on disk:</p>
+
+<figure class="code"><pre><code>result = run_experiment(sequence=1, backbone="resnet50", epochs=5, root=DATA, output=SAVE)
+
+result["totals"]["peak_memory_bytes"]     # the binding constraint
+result["totals"]["gpu_hours"]
+result["costs"]                           # one row per request
+result["environment"]["gpu"]              # and torch version, commit, sizes
+result["environment"]["hypernetwork_parameters"]</code></pre></figure>
+
+<p>Four files per run, named for the sequence, backbone and seed:
+  <code>history_</code>, <code>summary_</code>, <code>costs_</code> and <code>environment_</code>.
+  The environment file records the GPU, the torch and CUDA versions, the git commit and every
+  <code>Config</code> field, so a number found months later can be traced back to the code that made
+  it. History and costs are rewritten after every request.</p>
 
 <h2>What the arguments do</h2>
 <div class="tablewrap">
@@ -557,7 +628,9 @@ history, numbers = run_experiment(config=config, root=DATA, output=SAVE)</code><
 </div>
 
 <h2>Reading the four numbers</h2>
-<p><code>run_experiment</code> returns <code>(history, numbers)</code>. Accuracy at the end hides the
+<p><code>run_experiment</code> returns a dict: <code>history</code>, <code>numbers</code>,
+  <code>costs</code>, <code>totals</code>, <code>environment</code> and the <code>config</code> it
+  used. Accuracy at the end hides the
   two failure modes the paper is about, which is why there are four.</p>
 
 <dl class="metrics">
@@ -601,6 +674,12 @@ pd.DataFrame([{ "i": r["index"], "action": r["action"], "task": r["task"],
     over seeds keeps all of its runs. Before that fix every run in a loop wrote the same filename and
     only the last one survived. Sweeping anything else, beta or gamma, still collides: use
     <code>output=None</code> and keep the returned numbers, or give each point its own directory.</li>
+  <li><strong>The import path changed.</strong> There is one package now. Put the repository root on
+    the path, not a subfolder, and import from <code>uncle.experiments</code>. The old
+    <code>uncle_from_scratch</code> folder is gone: its data and task code moved into
+    <code>uncle/</code>, its entry points into <code>uncle/experiments.py</code> and
+    <code>uncle/baseline.py</code>, and there is no longer a second Tiny ImageNet loader with a
+    different class grouping.</li>
 </ul>
 
 </section>
@@ -695,15 +774,16 @@ pd.DataFrame([{ "i": r["index"], "action": r["action"], "task": r["task"],
   averaged over the unlearn requests (Table 2).</p>
 <p><span class="lead">Why</span> This is the headline claim: UnCLe forgets completely and keeps the
   rest. The four numbers together are the evidence.</p>
-<figure class="code"><pre><code>from run import run_experiment
+<figure class="code"><pre><code>from uncle.experiments import run_experiment
 
 for seed in (0, 1, 2):
-    history, numbers = run_experiment(
+    result = run_experiment(
         sequence=1, backbone="resnet50", epochs=5, seed=seed,
         root=DATA, output=SAVE,
     )
-    print(seed, numbers["retain_accuracy"], numbers["forget_accuracy"],
-          numbers["mean_spill"], numbers["mean_relapse"])</code></pre></figure>
+    n = result["numbers"]
+    print(seed, n["retain_accuracy"], n["forget_accuracy"],
+          n["mean_spill"], n["mean_relapse"], result["totals"]["total_seconds"])</code></pre></figure>
 <p><span class="lead">Watch for</span> FA landing on 10.00 and staying there, and spill under one.
   Those are the two the paper wins on by a wide margin. Here are its numbers to check against:</p>
 <div class="tablewrap">
@@ -759,8 +839,8 @@ plt.xlabel("request"); plt.ylabel(f"task {task} accuracy %"); plt.show()</code><
   new. The paper calls this the stability and plasticity balance, and it is dataset-specific: the same
   sweep picks 0.1 for Permuted MNIST and 0.01 for Tiny ImageNet.</p>
 <figure class="code"><pre><code>for beta in (1.0, 0.1, 0.01, 0.001):
-    _, n = run_experiment(sequence=1, backbone="resnet50", epochs=5,
-                          beta=beta, root=DATA, output=None, verbose=False)
+    n = run_experiment(sequence=1, backbone="resnet50", epochs=5,
+                       beta=beta, root=DATA, output=None, verbose=False)["numbers"]
     print(f"beta={beta:&lt;7} RA={n['retain_accuracy']:.2f}")</code></pre></figure>
 <p><span class="lead">Watch for</span> How flat the curve is. On Permuted MNIST the paper's four values
   span 96.24 to 96.68, which is nearly nothing. On Tiny ImageNet they span 8.49 to 53.74. The harder
@@ -779,8 +859,8 @@ plt.xlabel("request"); plt.ylabel(f"task {task} accuracy %"); plt.show()</code><
   configuration that forgets badly win on average.</p>
 <figure class="code"><pre><code>rows = []
 for gamma in (0.1, 0.01, 0.001):
-    _, n = run_experiment(sequence=1, backbone="resnet50", epochs=5,
-                          gamma=gamma, root=DATA, output=None, verbose=False)
+    n = run_experiment(sequence=1, backbone="resnet50", epochs=5,
+                       gamma=gamma, root=DATA, output=None, verbose=False)["numbers"]
     rows.append((gamma, n["forget_accuracy"], n["retain_accuracy"]))
 
 ok = [r for r in rows if r[1] &lt;= 10.0]          # the paper's rule, in order
@@ -811,10 +891,10 @@ def timed():
 for decay in (1.0, 0.9):                    # 1.0 turns annealing off
     marks, hook = timed()
     start = time.perf_counter()
-    _, n = run_experiment(sequence=1, backbone="resnet50", epochs=5,
-                          burn_in_decay=decay, root=DATA,
-                          output=None, verbose=False, on_request=hook)
-    print(decay, n["forget_accuracy"], f"{time.perf_counter() - start:.0f}s total")</code></pre></figure>
+    out = run_experiment(sequence=1, backbone="resnet50", epochs=5,
+                         burn_in_decay=decay, root=DATA,
+                         output=None, verbose=False, on_request=hook)
+    print(decay, out["numbers"]["forget_accuracy"], out["totals"]["forget"])</code></pre></figure>
 <p><span class="lead">Watch for</span> The <code>burn_in</code> field in each forget record: 100, 90,
   81, 72 and so on down to 20. And check FA really does stay at 10 as the budget shrinks, because that
   is the claim. The small addition is the timing: the code records burn-in but not seconds, so wrap
@@ -869,13 +949,14 @@ for decay in (1.0, 0.9):                    # 1.0 turns annealing off
   96.87) and 5-Tasks (94.12 to 94.12), clear gains on Tiny ImageNet and CIFAR-100. The easy datasets
   never fill up, so there is nothing to recover.</p>
 <figure class="code"><pre><code>from dataclasses import replace
-from run import make_config, run_experiment
+from uncle.experiments import make_config, run_experiment
 
 both = make_config(sequence=1, backbone="resnet50", epochs=5)
 only_learn = replace(both, requests=tuple(r for r in both.requests if r[0] == "learn"))
 
-history_b, with_unlearning = run_experiment(config=both, root=DATA, output=SAVE)
-history_l, _ = run_experiment(config=only_learn, root=DATA, output=None)
+run_b = run_experiment(config=both, root=DATA, output=SAVE)
+run_l = run_experiment(config=only_learn, root=DATA, output=None)
+history_b, history_l = run_b["history"], run_l["history"]
 
 # Score both runs on the tasks the real sequence still holds at the end,
 # not on all twenty: the learning-only run never gave any of them up.
@@ -883,7 +964,7 @@ last = history_b[-1]
 kept = [t for t in last["seen"] if t not in set(last["forgotten"])]
 final_learning_only = history_l[-1]["after"]
 
-print("with unlearning", with_unlearning["retain_accuracy"])
+print("with unlearning", run_b["numbers"]["retain_accuracy"])
 print("only learning  ", sum(final_learning_only[t] for t in kept) / len(kept))
 print("on tasks", kept)</code></pre></figure>
 <p><span class="lead">Watch for</span> The comparison has to be on the same set of tasks. The
@@ -940,8 +1021,9 @@ print("mean unlearning time", sum(forgets) / len(forgets))</code></pre></figure>
 <figure class="code"><pre><code>for sequence in (1, 2, 3):
     for backbone in ("resnet18", "resnet50"):
         for seed in (0, 1, 2):
-            _, n = run_experiment(sequence=sequence, backbone=backbone, epochs=5,
-                                  seed=seed, root=DATA, output=SAVE, verbose=False)
+            n = run_experiment(sequence=sequence, backbone=backbone, epochs=5,
+                               seed=seed, root=DATA, output=SAVE,
+                               verbose=False)["numbers"]
             print(sequence, backbone, seed, n["retain_accuracy"], n["forget_accuracy"])</code></pre></figure>
 <p><span class="lead">Watch for</span> That is eighteen full runs, so budget it before you start. And
   one oddity in the paper worth confirming: on CIFAR-100, ResNet18 gets a <em>higher</em> retained

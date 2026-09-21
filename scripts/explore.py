@@ -1,6 +1,10 @@
 """Explore real images and save a small, reproducible report. No training yet."""
 
 import argparse
+from pathlib import Path as _Path
+import sys
+
+sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
 from collections import Counter
 import json
 from pathlib import Path
@@ -12,7 +16,7 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision.transforms import ToTensor
 
-from data import DEFAULT_ROOT, TinyImageNet, prepare_data
+from uncle.tinyimagenet import DEFAULT_ROOT, TinyImageNet, prepare_data
 
 
 def class_counts(dataset):

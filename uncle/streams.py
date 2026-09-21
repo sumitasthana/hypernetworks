@@ -16,8 +16,8 @@ from pathlib import Path
 from torch.utils.data import Subset
 from torchvision.transforms import ToTensor
 
-from data import DEFAULT_ROOT, TinyImageNet, prepare_data
-from tasks import DEFAULT_PARTITION, ClassTask, load_partition
+from .tinyimagenet import DEFAULT_ROOT, TinyImageNet, prepare_data
+from .tasks import DEFAULT_PARTITION, ClassTask, load_partition
 
 
 def build_tasks(config=None, root=DEFAULT_ROOT, partition_path=DEFAULT_PARTITION,

@@ -88,11 +88,10 @@ class Config:
     )
 
     # Tiny ImageNet only. The paper gives 10 tasks of 10 classes but never says
-    # which classes or in what order, so the split rule is a knob here.
-    # "sorted" chunks the wnids in alphabetical order, "random" shuffles them
-    # first using `seed`.
+    # which classes. The grouping lives in uncle/task_partition.json: the 200
+    # WordNet IDs shuffled with seed 42 into 20 disjoint groups of ten, written
+    # once and verified on every run.
     classes_per_task: int = 10
-    class_order: str = "sorted"
 
     backbone: str = "resnet18"        # "resnet18", "resnet50", or "cnn"
     seed: int = 0
@@ -142,8 +141,6 @@ class Config:
 
         if self.dataset not in DATASETS:
             raise ValueError(f"Unknown dataset: {self.dataset}")
-        if self.class_order not in ("sorted", "random"):
-            raise ValueError(f"Unknown class_order: {self.class_order}")
         if self.classes_per_task < 2:
             raise ValueError("classes_per_task must be at least 2.")
         if self.backbone not in ("resnet18", "resnet50", "cnn"):

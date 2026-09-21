@@ -38,9 +38,6 @@ def parse_args() -> Config:
 
     parser.add_argument("--dataset", default=defaults.dataset,
                         choices=("permuted_mnist", "tiny_imagenet"))
-    parser.add_argument("--class-order", default=defaults.class_order,
-                        choices=("sorted", "random"),
-                        help="Tiny ImageNet only: how classes are grouped into tasks")
     parser.add_argument("--backbone", default=defaults.backbone,
                         choices=("resnet18", "resnet50", "cnn"))
     parser.add_argument("--sequence", type=int, default=1, choices=(1, 2, 3),
@@ -64,7 +61,6 @@ def parse_args() -> Config:
 
     return Config(
         **settings,
-        class_order=arguments.class_order,
         backbone=arguments.backbone,
         epochs=arguments.epochs,
         chunks=arguments.chunks,

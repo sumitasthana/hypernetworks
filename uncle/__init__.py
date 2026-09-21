@@ -8,10 +8,13 @@ Forgetting a task trains the hypernetwork to turn that task's code into noise,
 which needs no data at all.
 """
 
+from .baseline import run_baseline
 from .config import Config
 from .experiment import run
+from .experiments import compare, make_config, run_experiment, run_sequences
 from .hypernet import HyperNetwork, build_target
 from .metrics import relapse, spill, summary
+from .streams import build_tasks
 from .trainer import UnCLe
 
 __all__ = [
@@ -19,8 +22,14 @@ __all__ = [
     "HyperNetwork",
     "UnCLe",
     "build_target",
+    "build_tasks",
+    "compare",
+    "make_config",
     "relapse",
     "run",
+    "run_baseline",
+    "run_experiment",
+    "run_sequences",
     "spill",
     "summary",
 ]

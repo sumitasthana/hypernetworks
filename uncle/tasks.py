@@ -8,7 +8,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import ToTensor
 
-from data import DEFAULT_ROOT, TinyImageNet, prepare_data
+from .tinyimagenet import DEFAULT_ROOT, TinyImageNet, prepare_data
 
 
 DEFAULT_PARTITION = Path(__file__).parent / "task_partition.json"

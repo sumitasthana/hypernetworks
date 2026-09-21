@@ -14,6 +14,7 @@ def run(
     config: Config,
     on_request: Callable[[dict], None] | None = None,
     tasks: dict | None = None,
+    on_start: Callable[[dict], None] | None = None,
 ) -> list[dict]:
     """Work through config.requests and return one record per request.
 
@@ -21,7 +22,11 @@ def run(
     print or log progress without this function knowing how.
 
     `tasks` lets a caller supply its own {task: {"train", "test"}} datasets
-    instead of the ones this config would build. Used by uncle_from_scratch.
+    instead of the ones this config would build.
+
+    `on_start` is called once with the built target, hypernetwork and tasks,
+    before the first request. It exists so a caller can record what it is about
+    to run, sizes included, without building any of it a second time.
     """
     torch.manual_seed(config.seed)
 
@@ -29,6 +34,10 @@ def run(
     target = build_target(config)
     hypernet = HyperNetwork(target, config)
     uncle = UnCLe(hypernet, config, target, tasks)
+
+    if on_start is not None:
+        on_start({"config": config, "target": target,
+                  "hypernet": hypernet, "tasks": tasks, "uncle": uncle})
 
     history: list[dict] = []
     seen: list[str] = []

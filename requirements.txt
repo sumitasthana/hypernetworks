@@ -1,2 +1,9 @@
 torch>=2.0
 torchvision>=0.15
+numpy>=1.24
+Pillow>=9.0
+
+# Progress bars and the exploration scripts and notebooks. The library runs
+# without these; tqdm is optional at import time.
+tqdm>=4.65
+matplotlib>=3.7

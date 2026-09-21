@@ -1,6 +1,10 @@
 """Prepare and inspect task ID 1. Run from any working directory."""
 
 import argparse
+from pathlib import Path as _Path
+import sys
+
+sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
 from collections import Counter
 import json
 from pathlib import Path
@@ -8,8 +12,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from data import DEFAULT_ROOT
-from tasks import DEFAULT_PARTITION, build_task
+from uncle.tinyimagenet import DEFAULT_ROOT
+from uncle.tasks import DEFAULT_PARTITION, build_task
 
 
 def describe_task(train, val):
