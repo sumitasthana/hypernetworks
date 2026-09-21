@@ -83,6 +83,11 @@ class TelemetryTests(unittest.TestCase):
                         steps=40 if action == "learn" else 100)
         return log
 
+    def test_protected_count_excludes_the_requests_own_task(self):
+        """The first learn protects nothing, however the record counts tasks."""
+        rows = self.rows().rows
+        self.assertEqual([row["protected"] for row in rows], [0, 1, 1])
+
     def test_totals_separate_learning_from_forgetting(self):
         totals = self.rows().totals()
         self.assertEqual(totals["requests"], 3)

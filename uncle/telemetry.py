@@ -21,6 +21,30 @@ import time
 import torch
 
 
+def progress_bar(total, description, enabled=True, leave=True):
+    """A tqdm bar where tqdm is installed, and a do-nothing stand-in where not.
+
+    tqdm ships with Colab and is not worth making a hard requirement for a
+    progress bar, so a missing import is not an error. The stand-in carries
+    `write` as well, so callers can print through the bar without having to
+    know which one they hold.
+    """
+    if enabled:
+        try:
+            from tqdm.auto import tqdm
+            return tqdm(total=total, desc=description, unit="step", leave=leave)
+        except ImportError:
+            pass
+
+    class Quiet:
+        def update(self, n=1): pass
+        def set_postfix_str(self, text): pass
+        def write(self, text): print(text, flush=True)
+        def close(self): pass
+
+    return Quiet()
+
+
 def gpu_name() -> str | None:
     return torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
 
@@ -107,7 +131,10 @@ class RunLog:
             "index": record["index"],
             "action": record["action"],
             "task": record["task"],
-            "protected": len(record["seen"]) - (record["action"] == "forget"),
+            # Always one fewer than the tasks seen: a request never protects
+            # its own task. `seen` already includes it, for a learn because it
+            # was just added and for a forget because it is still on the list.
+            "protected": max(len(record["seen"]) - 1, 0),
             "steps": steps,
             "seconds": now - self._mark,
             "elapsed_seconds": now - self._began,

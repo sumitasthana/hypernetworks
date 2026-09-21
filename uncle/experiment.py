@@ -15,6 +15,7 @@ def run(
     on_request: Callable[[dict], None] | None = None,
     tasks: dict | None = None,
     on_start: Callable[[dict], None] | None = None,
+    progress: bool = False,
 ) -> list[dict]:
     """Work through config.requests and return one record per request.
 
@@ -23,6 +24,9 @@ def run(
 
     `tasks` lets a caller supply its own {task: {"train", "test"}} datasets
     instead of the ones this config would build.
+
+    `progress` puts a bar on each request's optimizer steps, which is the only
+    scale that says anything while a forty-minute request is running.
 
     `on_start` is called once with the built target, hypernetwork and tasks,
     before the first request. It exists so a caller can record what it is about
@@ -33,7 +37,7 @@ def run(
     tasks = build_tasks(config) if tasks is None else tasks
     target = build_target(config)
     hypernet = HyperNetwork(target, config)
-    uncle = UnCLe(hypernet, config, target, tasks)
+    uncle = UnCLe(hypernet, config, target, tasks, progress=progress)
 
     if on_start is not None:
         on_start({"config": config, "target": target,

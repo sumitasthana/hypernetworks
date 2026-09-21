@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from .config import Config
 from .hypernet import HyperNetwork
+from .telemetry import progress_bar
 
 
 class UnCLe:
@@ -25,6 +26,7 @@ class UnCLe:
         config: Config,
         target: nn.Module | None = None,
         tasks: dict[str, dict[str, Dataset]] | None = None,
+        progress: bool = False,
     ):
         # target and tasks are only needed to measure accuracy and to learn.
         # A caller that just wants `forget` can leave them out.
@@ -33,6 +35,9 @@ class UnCLe:
         self.tasks = tasks
         self.config = config
         self.device = config.torch_device
+        # One request can be forty minutes of ResNet50. A bar per request tells
+        # you nothing while it runs, so the bars below count optimizer steps.
+        self.progress = progress
 
         # A clean set of running statistics for every new task to start from.
         self.buffer_template: dict[str, torch.Tensor] = (
@@ -104,7 +109,10 @@ class UnCLe:
         self.target.train()
         epoch_losses = []
 
-        for _ in range(self.config.epochs):
+        bar = progress_bar(self.config.epochs * len(loader),
+                           f"learn {task}", self.progress, leave=False)
+
+        for epoch in range(self.config.epochs):
             running, batches = 0.0, 0
 
             for images, labels in loader:
@@ -127,9 +135,13 @@ class UnCLe:
 
                 running += loss.item()
                 batches += 1
+                bar.update(1)
+                bar.set_postfix_str(
+                    f"epoch {epoch + 1}/{self.config.epochs}, loss {loss.item():.3f}")
 
             epoch_losses.append(running / batches)
 
+        bar.close()
         return epoch_losses
 
     # -- forget --------------------------------------------------------------
@@ -163,6 +175,8 @@ class UnCLe:
         self.hypernet.train()
         losses = []
 
+        bar = progress_bar(iterations, f"forget {task}", self.progress, leave=False)
+
         for _ in range(iterations):
             raw = self.hypernet.raw_for(task)
 
@@ -184,7 +198,10 @@ class UnCLe:
             optimizer.step()
 
             losses.append(loss.item())
+            bar.update(1)
+            bar.set_postfix_str(f"loss {loss.item():.3f}")
 
+        bar.close()
         return losses
 
     # -- measurement ---------------------------------------------------------

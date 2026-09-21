@@ -624,7 +624,19 @@ results = run_sequences(
   multiply before committing to the rest.</p>
 
 <h2>What a run costs</h2>
-<p>Every request is timed, and on a GPU its peak memory is recorded around it. Learning and
+<p>While a run is going you get two bars, because a request is the wrong unit to watch. A learn
+  request on ResNet50 is tens of minutes, so a bar that ticks once per request tells you nothing
+  about whether anything is happening. The inner bar counts optimizer steps and shows the current
+  epoch and loss; the outer one counts requests and shows what each one cost as it lands.</p>
+
+<figure class="code"><pre><code>learn 3:  46%|####6     | 179/390 [01:24&lt;01:39, 2.12step/s, epoch 3/5, loss 1.284]
+sequence 1:  10%|#         | 3/30 [06:51&lt;61:44, 137.2s/step, 181s, 4.2 GiB]</code></pre></figure>
+
+<p>They need no arguments, and turn themselves off when tqdm is not installed. Pass
+  <code>progress=False</code> to be rid of them, and <code>verbose=False</code> to drop the
+  per-request lines and keep only the bars, which is the cleanest combination for a long run.</p>
+
+<p>Every request is also timed, and on a GPU its peak memory is recorded around it. Learning and
   forgetting are very different jobs, so they are reported separately rather than averaged into one
   meaningless number. A finished run prints this:</p>
 

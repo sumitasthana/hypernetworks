@@ -30,31 +30,8 @@ from .config import Config, dataset_defaults
 from .experiment import run as run_requests
 from .metrics import summary
 from .streams import build_tasks
-from .telemetry import RunLog, environment, learn_steps
+from .telemetry import RunLog, environment, learn_steps, progress_bar
 from .tinyimagenet import DEFAULT_ROOT
-
-
-def _progress(total, description, enabled=True):
-    """A tqdm bar when tqdm is installed, and a do-nothing stand-in when not.
-
-    tqdm is on Colab already and is not worth making a hard requirement for a
-    progress bar, so the import failing is not an error.
-    """
-    if enabled:
-        try:
-            from tqdm.auto import tqdm
-            return tqdm(total=total, desc=description, unit="req")
-        except ImportError:
-            pass
-
-    class Quiet:
-        def update(self, n=1): pass
-        def set_postfix_str(self, text): pass
-        def close(self): pass
-        def __enter__(self): return self
-        def __exit__(self, *exc): self.close()
-
-    return Quiet()
 
 
 def make_config(sequence=1, limit_requests=None, **overrides) -> Config:
@@ -103,8 +80,10 @@ def run_experiment(sequence=1, limit_requests=None, max_images=None,
     names carry the sequence, backbone and seed, so a sweep over those does not
     overwrite itself; sweeping anything else still collides.
 
-    `progress` shows a tqdm bar when tqdm is installed. `verbose` prints a line
-    per request and a summary at the end. `on_request` is called with each
+    `progress` shows tqdm bars when tqdm is installed: one counting the
+    requests, and one inside each request counting optimizer steps, which is
+    the only scale that moves while a long request runs. `verbose` prints a
+    line per request and a summary at the end. `on_request` is called with each
     record on top of both. `config` takes a prepared Config and ignores the
     override arguments; `sequence` then only labels the output files.
     `download` fetches the dataset when it is missing, which a fresh Colab
@@ -153,7 +132,7 @@ def run_experiment(sequence=1, limit_requests=None, max_images=None,
                 json.dumps(facts, indent=2, default=str) + "\n", encoding="utf-8")
 
     history = []
-    bar = _progress(len(config.requests), f"sequence {sequence}", progress)
+    bar = progress_bar(len(config.requests), f"sequence {sequence}", progress)
     log.start()
 
     def record_done(record):
@@ -163,7 +142,8 @@ def run_experiment(sequence=1, limit_requests=None, max_images=None,
         cost = log.measure(record, steps=steps)
 
         if verbose:
-            print(describe(record), flush=True)
+            # Through the bar, so the line does not land on top of it.
+            bar.write(describe(record))
         bar.update(1)
         bar.set_postfix_str(
             f"{cost['seconds']:.0f}s"
@@ -179,7 +159,7 @@ def run_experiment(sequence=1, limit_requests=None, max_images=None,
 
     try:
         run_requests(config, on_request=record_done, tasks=tasks,
-                     on_start=record_environment)
+                     on_start=record_environment, progress=progress)
     finally:
         bar.close()
 
@@ -250,7 +230,7 @@ def run_sequences(sequences=(1, 2, 3), seeds=(0,), output=None, verbose=True,
     runs = [(sequence, seed) for sequence in sequences for seed in seeds]
     results = []
 
-    outer = _progress(len(runs), f"{len(runs)} runs", progress)
+    outer = progress_bar(len(runs), f"{len(runs)} runs", progress)
     for sequence, seed in runs:
         if verbose:
             print(f"\n{'=' * 64}\nsequence {sequence}, seed {seed}\n{'=' * 64}")
