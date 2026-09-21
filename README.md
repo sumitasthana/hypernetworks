@@ -49,10 +49,41 @@ default setting, so those are the numbers to check against.
 | `uncle/experiment.py` | Works through a request sequence, returns records |
 | `main.py` | Command line entry point and printing |
 | `uncle_minimal.py` | The same method in one flat file, for reading |
+| `uncle_from_scratch/` | A separate rebuild, data first, reusing this package |
 | `Scalable_Hypernetworks_...ipynb` | Colab notebook, a scaled-up run in progress |
 
 `uncle_minimal.py` is not imported by anything. It exists so the method can be
 read top to bottom in one sitting before meeting the package.
+
+## The rebuild next door
+
+`uncle_from_scratch/` works up to the same method in stages, starting from the
+data rather than the method, so each piece can be checked before the next one
+lands. It has its own Tiny ImageNet loader and its own task partition: 200
+WordNet IDs shuffled with seed 42 into 20 groups of ten, saved to a file and
+verified on every run.
+
+It does not reimplement the method. The hypernetwork, the learn and forget
+operations, the four metrics and the Table 4 sequences all come from this
+package. Three modules join the two, and they are libraries first because the
+real runs happen on a Colab GPU:
+
+```python
+import sys
+sys.path.insert(0, "uncle_from_scratch")
+
+from run import run_experiment
+history, numbers = run_experiment(sequence=1, backbone="resnet50", epochs=5)
+```
+
+Any `Config` field passes through as a keyword argument, so a sweep is a loop
+over calls. `uncle_from_scratch/colab_guide.html` is the Colab walkthrough:
+nine cells and five worked examples. `uncle_from_scratch/README.md` has the
+rest.
+
+Task IDs are not comparable between the two. `uncle/data.py` cuts sorted
+WordNet IDs into consecutive blocks; the rebuild shuffles them first. Task 3 is
+ten different classes in each, so name the partition whenever you compare.
 
 ## Use it from your own code
 

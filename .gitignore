@@ -11,3 +11,13 @@ data/
 *.pdf
 
 .claude/settings.local.json
+
+# Research write-ups and their build assets stay local, like the paper above
+UnCLe-*.docx
+UnCLe-*.xlsx
+UnCLe-research-angles-validation.md
+proposal-assets/
+~$*
+
+# Measurements written by explore.py, task1.py and run.py
+uncle_from_scratch/outputs/

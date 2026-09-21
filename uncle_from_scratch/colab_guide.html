@@ -1,0 +1,509 @@
+<title>UnCLe on Colab</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --ground: #f6f7fb;
+    --surface: #ffffff;
+    --sunk: #eef0f7;
+    --ink: #191d28;
+    --muted: #5b6377;
+    --line: #dde1ec;
+    --learn: #0f6f63;
+    --forget: #b4482f;
+    --accent: #2f4bc4;
+    --code-ink: #26304a;
+
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #101219;
+      --surface: #191d27;
+      --sunk: #14171f;
+      --ink: #e4e8f2;
+      --muted: #98a1b6;
+      --line: #2a3040;
+      --learn: #4fbfae;
+      --forget: #e2846b;
+      --accent: #8fa4f5;
+      --code-ink: #cdd6ea;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #101219;
+    --surface: #191d27;
+    --sunk: #14171f;
+    --ink: #e4e8f2;
+    --muted: #98a1b6;
+    --line: #2a3040;
+    --learn: #4fbfae;
+    --forget: #e2846b;
+    --accent: #8fa4f5;
+    --code-ink: #cdd6ea;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.62;
+  }
+  .wrap { max-width: 47rem; margin: 0 auto; padding-inline: 20px; padding-block: 0 5rem; }
+
+  header.top {
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+    margin-bottom: 3rem;
+  }
+  header.top .wrap { padding-block: 3.2rem 2.4rem; }
+  .eyebrow {
+    font-family: var(--display);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 0.9rem;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(2rem, 6vw, 2.9rem);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    margin: 0 0 1rem;
+    text-wrap: balance;
+  }
+  header.top p.lede { margin: 0; color: var(--muted); font-size: 1.08rem; max-width: 36rem; }
+  header.top p.lede code { font-size: 0.92em; }
+
+  h2 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.42rem;
+    letter-spacing: -0.01em;
+    margin: 3.6rem 0 0.4rem;
+    text-wrap: balance;
+  }
+  h2:first-of-type { margin-top: 0; }
+  h3 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.05rem;
+    margin: 2.4rem 0 0.3rem;
+  }
+  p { margin: 0.75rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .cell { margin-top: 1.4rem; }
+  .cell-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.7rem;
+    font-family: var(--display);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.45rem;
+  }
+  .cell-num {
+    font-variant-numeric: tabular-nums;
+    color: var(--surface);
+    background: var(--ink);
+    border-radius: 3px;
+    padding: 0.1rem 0.42rem;
+    letter-spacing: 0.04em;
+  }
+  .cell-note { text-transform: none; letter-spacing: 0; font-weight: 500; }
+
+  figure.code { margin: 0; position: relative; }
+  pre {
+    margin: 0;
+    background: var(--sunk);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 1rem 1.05rem;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 0.83rem;
+    line-height: 1.66;
+    color: var(--code-ink);
+    tab-size: 4;
+  }
+  code { font-family: var(--mono); font-size: 0.87em; }
+  p code, li code, td code {
+    background: var(--sunk);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 0.05em 0.3em;
+  }
+  button.copy {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    font-family: var(--display);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 0.24rem 0.5rem;
+    cursor: pointer;
+  }
+  button.copy:hover { color: var(--ink); }
+  button.copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    padding: 0.85rem 1rem;
+    margin: 1.4rem 0;
+    font-size: 0.95rem;
+  }
+  .note strong { font-family: var(--display); font-weight: 600; }
+  .note.warn { border-left-color: var(--forget); }
+
+  .tablewrap { overflow-x: auto; margin: 1.3rem 0; border: 1px solid var(--line); border-radius: 6px; }
+  table { border-collapse: collapse; width: 100%; background: var(--surface); font-size: 0.93rem; }
+  th, td { text-align: left; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th {
+    font-family: var(--display);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  tr:last-child td { border-bottom: none; }
+  td:first-child { white-space: nowrap; font-family: var(--mono); font-size: 0.82rem; }
+
+  dl.metrics { margin: 1.3rem 0; display: grid; gap: 0.75rem; }
+  dl.metrics > div {
+    display: grid;
+    grid-template-columns: 5.4rem 1fr;
+    gap: 0.9rem;
+    align-items: baseline;
+  }
+  dl.metrics dt {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  dl.metrics dd { margin: 0; font-size: 0.96rem; }
+  .is-learn { color: var(--learn); }
+  .is-forget { color: var(--forget); }
+  @media (max-width: 460px) {
+    dl.metrics > div { grid-template-columns: 1fr; gap: 0.1rem; }
+  }
+
+  ul.plain { margin: 0.8rem 0; padding-left: 1.2rem; }
+  ul.plain li { margin: 0.4rem 0; }
+
+  footer.end {
+    margin-top: 4rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <p class="eyebrow">uncle_from_scratch</p>
+    <h1>Running UnCLe on Colab</h1>
+    <p class="lede">Nine cells, in order. The tasks come from this folder; the hypernetwork, the
+      <span class="is-learn">learn</span> and <span class="is-forget">forget</span> operations and the
+      four metrics come from the <code>uncle</code> package next door.</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>Setup</h2>
+<p>Three cells, once per runtime. Runtime &rarr; Change runtime type &rarr; T4 GPU before you start,
+  otherwise everything below runs on a CPU and the ResNet runs are hopeless.</p>
+
+<div class="cell">
+  <div class="cell-head"><span class="cell-num">1</span><span>Clone and put the folder on the path</span></div>
+  <figure class="code"><pre><code>!git clone -q https://github.com/sumitasthana/hypernetworks /content/hypernetworks
+
+import sys
+sys.path.insert(0, "/content/hypernetworks/uncle_from_scratch")</code></pre></figure>
+</div>
+
+<div class="note">
+  <strong>Do not</strong> <code>pip install -r requirements.txt</code> here. Colab already ships torch,
+  torchvision, numpy, Pillow and matplotlib, and reinstalling torch is the fastest way to get a build
+  that cannot see the GPU. That file is for a local machine.
+</div>
+
+<div class="cell">
+  <div class="cell-head"><span class="cell-num">2</span><span>Confirm the GPU is really there</span></div>
+  <figure class="code"><pre><code>import torch
+print(torch.cuda.is_available(), torch.cuda.get_device_name(0))</code></pre></figure>
+</div>
+
+<p>Every entry point picks <code>cuda</code> on its own when it is available, so there is nothing to
+  pass. If this prints <code>False</code>, stop and fix the runtime type.</p>
+
+<div class="cell">
+  <div class="cell-head"><span class="cell-num">3</span><span>Mount Drive, so the 240 MB download happens once</span></div>
+  <figure class="code"><pre><code>from google.colab import drive
+drive.mount("/content/drive")
+
+# Must end in tiny-imagenet-200: that is what download=True checks before fetching.
+DATA = "/content/drive/MyDrive/uncle/data/tiny-imagenet-200"
+SAVE = "/content/drive/MyDrive/uncle/results"</code></pre></figure>
+</div>
+
+<p>Pass <code>root=DATA, download=True</code> the first time. The archive extracts into Drive and
+  every later runtime finds it already there. Leave <code>root</code> out entirely and the data lands
+  inside the cloned repo, which disappears with the runtime.</p>
+
+<h2>Example 1: the smoke test</h2>
+<p>Run this before anything expensive. It uses the small stand-in network, 32 chunks, one epoch, the
+  first five requests and 300 images per task, so it finishes in minutes and proves the whole path
+  works: partition, data, hypernetwork, learn, forget, metrics.</p>
+
+<div class="cell">
+  <div class="cell-head"><span class="cell-num">4</span><span class="cell-note">minutes</span></div>
+  <figure class="code"><pre><code>from run import run_experiment
+
+history, numbers = run_experiment(
+    sequence=1,
+    backbone="cnn",
+    chunks=32,
+    epochs=1,
+    limit_requests=5,
+    max_images=300,
+    root=DATA,
+    download=True,       # first run only; harmless afterwards
+)</code></pre></figure>
+</div>
+
+<p>You get one line per request as it lands:</p>
+<figure class="code"><pre><code>sequence 1: 5 requests over 4 tasks, backbone cnn, 32 chunks, beta 0.01, gamma 0.01, device cuda
+[ 0] learn  task 3  loss=2.2814  3:14.0
+[ 1] learn  task 0  loss=2.2537  3:11.3 0:16.7
+[ 2] forget task 3  loss=0.0091 burn_in=100  3:10.0 0:16.3
+[ 3] learn  task 9  loss=2.2461  3:10.0 0:15.7 9:13.3
+[ 4] learn  task 5  loss=2.2013  3:10.0 0:16.0 9:13.7 5:14.3</code></pre></figure>
+
+<p>Read the trailing numbers as <code>task:accuracy</code>. Do not expect much from one epoch on 300
+  images: what matters here is that request 2 pushed task 3 down and left the others roughly where
+  they were.</p>
+
+<h2>Example 2: the paper's setting</h2>
+<p>Thirty requests over twenty tasks, ResNet50 generated in 200 chunks. This is the real run, and it
+  wants hours. <code>output</code> makes it survivable: the history is rewritten to Drive after every
+  single request, so a disconnected runtime costs you the current request, not the run.</p>
+
+<div class="cell">
+  <div class="cell-head"><span class="cell-num">5</span><span class="cell-note">hours</span></div>
+  <figure class="code"><pre><code>history, numbers = run_experiment(
+    sequence=1,           # rows 1, 2 and 3 are the paper's Table 4
+    backbone="resnet50",
+    chunks=200,
+    epochs=5,
+    root=DATA,
+    output=SAVE,          # history_sequence1.json, rewritten each request
+)
+
+print(numbers["retain_accuracy"], numbers["forget_accuracy"])</code></pre></figure>
+</div>
+
+<div class="note warn">
+  <strong>Time it before you trust it.</strong> Watch the wall clock between request 0 and request 1,
+  then multiply by thirty. A T4 session has a limit, and if one learn request takes forty minutes the
+  full sequence will not finish inside it. Drop to <code>backbone="resnet18"</code>, fewer
+  <code>epochs</code>, or split the sequence with <code>limit_requests</code>.
+</div>
+
+<h2>Example 3: sweeping a parameter</h2>
+<p>Every <code>Config</code> field passes straight through as a keyword argument, so a sweep is a loop
+  over calls. Nothing is written to disk and nothing is printed, so the loop stays readable.</p>
+
+<div class="cell">
+  <div class="cell-head"><span class="cell-num">6</span><span>gamma: how hard forgetting pushes</span></div>
+  <figure class="code"><pre><code>results = {}
+for gamma in (0.001, 0.01, 0.1, 1.0):
+    _, results[gamma] = run_experiment(
+        sequence=1, backbone="resnet18", chunks=64, epochs=2,
+        limit_requests=10, root=DATA,
+        gamma=gamma, output=None, verbose=False,
+    )
+
+for gamma, n in results.items():
+    print(f"gamma={gamma:<6} RA={n['retain_accuracy']:.2f}  "
+          f"FA={n['forget_accuracy']:.2f}  spill={n['mean_spill']:.2f}")</code></pre></figure>
+</div>
+
+<p>The same shape works for <code>beta</code> (how hard the other tasks are held still),
+  <code>chunks</code>, <code>burn_in</code>, <code>noise_samples</code> or <code>seed</code>. Vary one
+  at a time and keep the rest fixed, or you will not know which knob moved the number.</p>
+
+<h2>Example 4: watching it live</h2>
+<p><code>on_request</code> is called with each record the moment it completes, so a long run can draw
+  itself instead of scrolling past.</p>
+
+<div class="cell">
+  <div class="cell-head"><span class="cell-num">7</span><span>a plot that grows as the run goes</span></div>
+  <figure class="code"><pre><code>import matplotlib.pyplot as plt
+from IPython.display import clear_output
+
+retained, forgotten = [], []
+
+def draw(record):
+    gone = set(record["forgotten"])
+    live = [t for t in record["seen"] if t not in gone]
+    retained.append(sum(record["after"][t] for t in live) / max(len(live), 1))
+    forgotten.append(sum(record["after"][t] for t in gone) / max(len(gone), 1) if gone else None)
+
+    clear_output(wait=True)
+    plt.figure(figsize=(7, 3))
+    plt.plot(retained, marker="o", label="retained tasks")
+    plt.plot(forgotten, marker="x", label="forgotten tasks")
+    plt.axhline(10, ls=":", c="grey", label="chance")
+    plt.xlabel("request"); plt.ylabel("accuracy %"); plt.legend(); plt.show()
+
+history, numbers = run_experiment(
+    sequence=1, backbone="resnet18", chunks=64, epochs=3,
+    root=DATA, output=SAVE, on_request=draw, verbose=False,
+)</code></pre></figure>
+</div>
+
+<h2>Example 5: the sanity check and the config</h2>
+<p>Two smaller things worth knowing. <code>run_baseline</code> trains the target network on one task
+  with ordinary backprop and no hypernetwork at all. If it cannot beat 10% on ten classes, nothing in
+  the runs above is worth debugging.</p>
+
+<div class="cell">
+  <div class="cell-head"><span class="cell-num">8</span><span>can the architecture learn one task at all?</span></div>
+  <figure class="code"><pre><code>from baseline import run_baseline
+
+report = run_baseline(task=1, backbone="resnet18", epochs=10, root=DATA)
+print(report["best_validation_accuracy"], "vs chance", report["chance_accuracy"])</code></pre></figure>
+</div>
+
+<p>And <code>make_config</code> hands you the settings before you spend anything on them. Print it,
+  change your mind, then pass the finished object in.</p>
+
+<div class="cell">
+  <div class="cell-head"><span class="cell-num">9</span><span>look before you spend</span></div>
+  <figure class="code"><pre><code>from run import make_config
+from dataclasses import replace
+
+config = make_config(sequence=2, backbone="resnet50", epochs=5)
+print(config)                      # every knob, including the 30 requests
+
+config = replace(config, epochs=3) # Config is frozen, so replace() rather than assign
+history, numbers = run_experiment(config=config, root=DATA, output=SAVE)</code></pre></figure>
+</div>
+
+<div class="note">
+  <strong>One or the other.</strong> Pass <code>config=</code> or pass overrides like
+  <code>epochs=3</code>, never both. Mixing them raises rather than silently ignoring half of what you
+  asked for.
+</div>
+
+<h2>What the arguments do</h2>
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Argument</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>sequence</td><td>1, 2 or 3: which row of the paper's Table 4 to run. Thirty requests each.</td></tr>
+    <tr><td>limit_requests</td><td>Stop after the first n. Cutting from the front keeps the list valid, because every forget still follows its learn.</td></tr>
+    <tr><td>max_images</td><td>Cap images per task, spread evenly so all ten classes survive. For checks, not results.</td></tr>
+    <tr><td>root</td><td>Where the dataset lives. Point it at Drive.</td></tr>
+    <tr><td>download</td><td>Fetch the archive when <code>root</code> is missing. Needs a path ending in <code>tiny-imagenet-200</code>.</td></tr>
+    <tr><td>output</td><td>Directory for the two JSON files, or <code>None</code> to keep everything in memory.</td></tr>
+    <tr><td>on_request</td><td>Called with each record as it finishes.</td></tr>
+    <tr><td>verbose</td><td>Whether to print the per-request lines.</td></tr>
+    <tr><td>config</td><td>A prepared <code>Config</code>, instead of the overrides.</td></tr>
+    <tr><td>anything else</td><td>Goes to <code>Config</code>: <code>backbone</code>, <code>epochs</code>, <code>chunks</code>, <code>batch_size</code>, <code>beta</code>, <code>gamma</code>, <code>burn_in</code>, <code>noise_samples</code>, <code>seed</code>, <code>device</code>.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Reading the four numbers</h2>
+<p><code>run_experiment</code> returns <code>(history, numbers)</code>. Accuracy at the end hides the
+  two failure modes the paper is about, which is why there are four.</p>
+
+<dl class="metrics">
+  <div><dt class="is-learn">RA</dt><dd><code>retain_accuracy</code> &mdash; average over tasks still held at the end. Higher is better.</dd></div>
+  <div><dt class="is-forget">FA</dt><dd><code>forget_accuracy</code> &mdash; average over forgotten tasks. Should sit at chance, 10%.</dd></div>
+  <div><dt>Spill</dt><dd><code>mean_spill</code> &mdash; how much one forget request disturbed every <em>other</em> task. Lower is better.</dd></div>
+  <div><dt>Relapse</dt><dd><code>mean_relapse</code> &mdash; how much a forgotten task crept back as later tasks were learned. Lower is better.</dd></div>
+</dl>
+
+<p>The paper reports 55.24% retained accuracy on Tiny ImageNet in Table 3, so that is the region to
+  check against. <code>history</code> holds a record per request with <code>before</code> and
+  <code>after</code> accuracy for every task seen so far, plus <code>final_loss</code> and the
+  annealed <code>burn_in</code> that forget request used.</p>
+
+<p>Both are plain JSON, so a finished or interrupted run reads back without rerunning anything:</p>
+<figure class="code"><pre><code>import json, pandas as pd
+history = json.load(open(f"{SAVE}/history_sequence1.json"))
+pd.DataFrame([{ "i": r["index"], "action": r["action"], "task": r["task"],
+                **{f"acc_{t}": v for t, v in r["after"].items()} } for r in history])</code></pre></figure>
+
+<h2>Five things that will bite</h2>
+<ul class="plain">
+  <li><strong>Memory grows with history.</strong> The regularizer regenerates every protected task's
+    weights in one graph, so by request 29 it is holding nineteen full sets of ResNet50 parameters at
+    once. If a late request dies with a CUDA out-of-memory error while early ones were fine, that is
+    why. Fewer <code>chunks</code>, a smaller <code>batch_size</code>, or ResNet18 are the levers.</li>
+  <li><strong>Data loading is single-threaded.</strong> The loaders inside <code>uncle/trainer.py</code>
+    use the default of zero workers, so JPEG decoding happens on the main process. At 5,000 images per
+    task it is probably not the bottleneck, but if the GPU looks idle, that is the first place to
+    look.</li>
+  <li><strong>Accuracy here is validation accuracy.</strong> Tiny ImageNet's public test split has no
+    labels, so the <code>test</code> slot holds <code>val</code>. Say so when you report a number.</li>
+  <li><strong>Task IDs differ between the two folders.</strong> This one shuffles the 200 WordNet IDs
+    with seed 42; <code>uncle/data.py</code> cuts them in sorted blocks. Task 3 is ten different
+    classes in each, so name the partition whenever you compare.</li>
+  <li><strong>A learn is not repeatable.</strong> The sequences never learn the same task twice and
+    <code>Config</code> rejects it if you try. Relearning a forgotten task needs a separate adaptation
+    path, which does not exist yet.</li>
+</ul>
+
+<footer class="end">
+  Reimplementation of <a href="https://arxiv.org/abs/2509.17530">An Unlearning Framework for Continual
+  Learning</a> (Adhikari, Kumaravelu, Srijith). Sample outputs above are illustrations of shape, not
+  measured results.
+</footer>
+
+</div>
+
+<script>
+  document.querySelectorAll("figure.code").forEach(function (figure) {
+    var button = document.createElement("button");
+    button.className = "copy";
+    button.type = "button";
+    button.textContent = "Copy";
+    button.addEventListener("click", function () {
+      var text = figure.querySelector("code").textContent;
+      navigator.clipboard.writeText(text).then(function () {
+        button.textContent = "Copied";
+        setTimeout(function () { button.textContent = "Copy"; }, 1400);
+      }, function () {
+        button.textContent = "Select it";
+        setTimeout(function () { button.textContent = "Copy"; }, 1400);
+      });
+    });
+    figure.appendChild(button);
+  });
+</script>
