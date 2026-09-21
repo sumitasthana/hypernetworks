@@ -311,11 +311,23 @@
   otherwise everything below runs on a CPU and the ResNet runs are hopeless.</p>
 
 <div class="cell">
-  <div class="cell-head"><span class="cell-num">1</span><span>Clone and put the repository root on the path</span></div>
-  <figure class="code"><pre><code>!git clone -q https://github.com/sumitasthana/hypernetworks /content/hypernetworks
+  <div class="cell-head"><span class="cell-num">1</span><span>Clone and install, once per runtime</span></div>
+  <figure class="code"><pre><code>import os, subprocess, sys
 
-import sys
-sys.path.insert(0, "/content/hypernetworks")</code></pre></figure>
+REPO = "/content/hypernetworks"
+URL = "https://github.com/sumitasthana/hypernetworks"
+
+if os.path.isdir(os.path.join(REPO, ".git")):
+    subprocess.run(["git", "-C", REPO, "pull", "-q"], check=True)
+else:
+    subprocess.run(["git", "clone", "-q", URL, REPO], check=True)
+
+subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", REPO, "--no-deps"],
+               check=True)
+os.chdir(REPO)
+
+import uncle
+print("uncle imported from", uncle.__file__)</code></pre></figure>
 </div>
 
 <div class="note">
@@ -326,10 +338,22 @@ sys.path.insert(0, "/content/hypernetworks")</code></pre></figure>
 </div>
 
 <div class="note warn">
-  <strong>Put the repository root on the path, not a folder inside it.</strong>
-  <code>/content/hypernetworks</code>, so that <code>import uncle</code> finds the package. An
-  earlier version of this project needed a subfolder on the path instead; that is no longer true and
-  no longer works.
+  <strong>If you see <code>ModuleNotFoundError: No module named 'uncle'</code></strong>, re-run the
+  cell above. That is nearly always the whole story, and the cell is safe to run any number of
+  times.
+  <br><br>
+  Two things make this happen more often than it should, and the cell is built against both.
+  <code>sys.path.insert</code> does not survive <strong>Runtime &rarr; Restart session</strong>, so
+  a restart quietly un-finds the package; <code>pip install -e</code> registers it properly and
+  <code>os.chdir</code> puts the repository root on the path regardless, because IPython keeps the
+  working directory there. And Colab wipes <code>/content</code> when a runtime is recycled or
+  deleted, which takes the clone with it. <code>sys.path.insert</code> never checks that the
+  directory exists, so the path can look perfectly correct while pointing at nothing at all: that
+  is why the cell ends by importing the package and printing where it came from. It either works
+  there or it fails there, instead of three cells later.
+  <br><br>
+  <code>--no-deps</code> stops pip reaching for torch, which Colab already has and which you do not
+  want reinstalled.
   <br><br>
   Two names that look alike and are not.
   <code>uncle.experiments</code> (plural) is the front door, and holds

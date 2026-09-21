@@ -14,7 +14,7 @@ The defaults are the paper's Permuted-MNIST setting: ResNet18 generated in 200
 chunks, 10 tasks, and request sequence 1 from Table 4. That wants a GPU.
 
 ```bash
-pip install -r requirements.txt
+pip install -e .                   # or: pip install -r requirements.txt
 python main.py                     # the paper's setting
 python main.py --sequence 2        # sequences 1, 2 and 3 are all from Table 4
 ```

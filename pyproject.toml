@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uncle"
+version = "0.1.0"
+description = "An unlearning framework for continual learning, reimplemented"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.0",
+    "torchvision>=0.15",
+    "numpy>=1.24",
+    "Pillow>=9.0",
+]
+
+[project.optional-dependencies]
+# Progress bars and the exploration scripts. The library runs without these.
+extras = ["tqdm>=4.65", "matplotlib>=3.7"]
+
+[project.scripts]
+uncle-run = "uncle.experiments:main"
+uncle-baseline = "uncle.baseline:main"
+
+[tool.setuptools]
+packages = ["uncle"]
+
+[tool.setuptools.package-data]
+# The class partition ships with the code: it is part of what defines a task.
+uncle = ["task_partition.json"]

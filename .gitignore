@@ -21,3 +21,8 @@ proposal-assets/
 
 # Measurements written by explore.py, task1.py and run.py
 uncle_from_scratch/outputs/
+
+# Editable installs and build output
+*.egg-info/
+build/
+dist/
