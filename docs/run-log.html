@@ -1,0 +1,354 @@
+<title>UnCLe Run Log</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --ground: #f6f7fb; --surface: #ffffff; --sunk: #eef0f7;
+    --ink: #191d28; --muted: #5b6377; --line: #dde1ec;
+    --good: #0f6f63; --bad: #b4482f; --accent: #2f4bc4; --code-ink: #26304a;
+    --good-bg: #e3f2ef; --bad-bg: #f8e6e0; --warn-ink: #8a6014; --warn-bg: #f8eed8;
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #101219; --surface: #191d27; --sunk: #14171f;
+      --ink: #e4e8f2; --muted: #98a1b6; --line: #2a3040;
+      --good: #4fbfae; --bad: #e2846b; --accent: #8fa4f5; --code-ink: #cdd6ea;
+      --good-bg: #14302c; --bad-bg: #331f19; --warn-ink: #e0bd7a; --warn-bg: #302713;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #101219; --surface: #191d27; --sunk: #14171f;
+    --ink: #e4e8f2; --muted: #98a1b6; --line: #2a3040;
+    --good: #4fbfae; --bad: #e2846b; --accent: #8fa4f5; --code-ink: #cdd6ea;
+    --good-bg: #14302c; --bad-bg: #331f19; --warn-ink: #e0bd7a; --warn-bg: #302713;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink);
+         font-family: var(--body); font-size: 17px; line-height: 1.62; }
+  .wrap { max-width: 48rem; margin: 0 auto; padding-inline: 20px; padding-block: 0 5rem; }
+
+  header.top { border-bottom: 1px solid var(--line); background: var(--surface);
+               margin-bottom: 3rem; }
+  header.top .wrap { padding-block: 3.2rem 2.4rem; }
+  .eyebrow { font-family: var(--display); font-size: 0.72rem; font-weight: 600;
+             letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+             margin: 0 0 0.9rem; }
+  h1 { font-family: var(--display); font-weight: 700;
+       font-size: clamp(2rem, 6vw, 2.8rem); line-height: 1.08;
+       letter-spacing: -0.02em; margin: 0 0 1rem; text-wrap: balance; }
+  header.top p { margin: 0; color: var(--muted); font-size: 1.06rem; max-width: 38rem; }
+
+  h2 { font-family: var(--display); font-weight: 600; font-size: 1.4rem;
+       letter-spacing: -0.01em; margin: 3.4rem 0 0.4rem; text-wrap: balance;
+       padding-top: 1.6rem; border-top: 1px solid var(--line); }
+  h2:first-of-type { margin-top: 0; border-top: none; padding-top: 0; }
+  h3 { font-family: var(--display); font-weight: 600; font-size: 1.02rem;
+       margin: 2rem 0 0.3rem; }
+  p { margin: 0.75rem 0; }
+  a { color: var(--accent); text-underline-offset: 2px; }
+
+  pre { margin: 1rem 0; background: var(--sunk); border: 1px solid var(--line);
+        border-radius: 6px; padding: 0.9rem 1rem; overflow-x: auto;
+        font-family: var(--mono); font-size: 0.8rem; line-height: 1.6;
+        color: var(--code-ink); }
+  code { font-family: var(--mono); font-size: 0.87em; }
+  p code, li code, td code { background: var(--sunk); border: 1px solid var(--line);
+                             border-radius: 3px; padding: 0.05em 0.3em; }
+
+  .tablewrap { overflow-x: auto; margin: 1.2rem 0; border: 1px solid var(--line);
+               border-radius: 6px; }
+  table { border-collapse: collapse; width: 100%; background: var(--surface);
+          font-size: 0.92rem; }
+  th, td { text-align: left; padding: 0.55rem 0.8rem;
+           border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--display); font-size: 0.7rem; font-weight: 600;
+       letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+  tr:last-child td { border-bottom: none; }
+  td.n { font-family: var(--mono); font-size: 0.82rem;
+         font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .verdict { display: inline-block; font-family: var(--display); font-size: 0.66rem;
+             font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+             border-radius: 3px; padding: 0.16rem 0.42rem; white-space: nowrap; }
+  .v-good { color: var(--good); background: var(--good-bg); }
+  .v-bad { color: var(--bad); background: var(--bad-bg); }
+  .v-warn { color: var(--warn-ink); background: var(--warn-bg); }
+
+  .note { border-left: 3px solid var(--accent); background: var(--surface);
+          padding: 0.8rem 1rem; margin: 1.3rem 0; font-size: 0.95rem; }
+  .note.bad { border-left-color: var(--bad); }
+  .note strong { font-family: var(--display); font-weight: 600; }
+
+  ul { margin: 0.7rem 0; padding-left: 1.2rem; }
+  li { margin: 0.35rem 0; }
+
+  dl.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+             gap: 1rem; margin: 1.4rem 0; }
+  dl.stats > div { background: var(--surface); border: 1px solid var(--line);
+                   border-radius: 6px; padding: 0.8rem 0.9rem; }
+  dl.stats dt { font-family: var(--display); font-size: 0.66rem; font-weight: 600;
+                letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+  dl.stats dd { margin: 0.25rem 0 0; font-family: var(--mono); font-size: 1.05rem;
+                font-variant-numeric: tabular-nums; }
+
+  footer { margin-top: 3.5rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+           color: var(--muted); font-size: 0.9rem; }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <p class="eyebrow">Experiment log &middot; 21 September 2026</p>
+    <h1>Sequence 1 on Tiny ImageNet, end to end</h1>
+    <p>The first complete run of this reimplementation at the paper's scale. It finished, it was
+      measured throughout, and it produced the wrong answer. This is the record of what was run,
+      what held up, what did not, and what the run costs.</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+<h2>The scenario</h2>
+<p>One pass of request sequence 1 from Table 4 of <a href="https://arxiv.org/abs/2509.17530">An
+  Unlearning Framework for Continual Learning</a>: thirty learn and unlearn requests over twenty
+  Tiny ImageNet tasks of ten classes each, on a single hypernetwork that generates a ResNet50 from
+  a 32-number code per task.</p>
+
+<div class="tablewrap">
+<table>
+  <tbody>
+    <tr><td>Hardware</td><td class="n">A100 GPU, Google Colab</td></tr>
+    <tr><td>Backbone</td><td class="n">ResNet50, generated in 200 chunks</td></tr>
+    <tr><td>Generated parameters</td><td class="n">23,520,842</td></tr>
+    <tr><td>Hypernetwork parameters</td><td class="n">134,015,898 (5.7&times; the network it generates)</td></tr>
+    <tr><td>Chunks per head</td><td class="n">174 weights, 24 residual, 2 batch norm</td></tr>
+    <tr><td>Hyperparameters</td><td class="n">beta 0.01, gamma 0.01, 10 noise samples, Adam at 1e-3</td></tr>
+    <tr><td>Burn-in</td><td class="n">100, annealed 10% per unlearn, floor 20</td></tr>
+    <tr><td>Epochs per learn</td><td class="n">5, batch size 64, so 395 optimizer steps</td></tr>
+    <tr><td>Task partition</td><td class="n">seed 42, saved in <code>uncle/task_partition.json</code></td></tr>
+    <tr><td>Run seed</td><td class="n">0</td></tr>
+    <tr><td>Code</td><td class="n">commit c6d89ce</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Vital statistics</h2>
+
+<dl class="stats">
+  <div><dt>Wall clock</dt><dd>55.9 min</dd></div>
+  <div><dt>GPU time</dt><dd>0.93 h</dd></div>
+  <div><dt>Peak GPU memory</dt><dd>7.72 GiB</dd></div>
+  <div><dt>Setup</dt><dd>3 s</dd></div>
+  <div><dt>Learn requests</dt><dd>18 &middot; 50.6 min</dd></div>
+  <div><dt>Forget requests</dt><dd>12 &middot; 5.3 min</dd></div>
+  <div><dt>Slowest request</dt><dd>302 s</dd></div>
+  <div><dt>Optimizer steps</dt><dd>7,820</dd></div>
+</dl>
+
+<p>Learning is 90% of the wall clock and forgetting 10%, which is the shape the paper's argument
+  predicts: unlearning is meant to be cheap because it needs no data.</p>
+
+<h2>The result, against the paper</h2>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Metric</th><th>This run</th><th>Paper</th><th></th></tr></thead>
+  <tbody>
+    <tr><td>Retain accuracy</td><td class="n">10.00%</td><td class="n">55.24%</td>
+        <td><span class="verdict v-bad">failed</span></td></tr>
+    <tr><td>Forget accuracy</td><td class="n">10.00%</td><td class="n">10.00%</td>
+        <td><span class="verdict v-warn">vacuous</span></td></tr>
+    <tr><td>Mean spill</td><td class="n">30.72</td><td class="n">0.722</td>
+        <td><span class="verdict v-bad">43&times; worse</span></td></tr>
+    <tr><td>Mean relapse</td><td class="n">0.00</td><td class="n">2.233</td>
+        <td><span class="verdict v-warn">vacuous</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note bad">
+  <strong>Two of these four numbers look good and mean nothing.</strong> Forget accuracy is 10%
+  because <em>every</em> task is at 10%. Relapse is 0 because a task that has collapsed to chance
+  cannot creep back. Read alongside a retain accuracy of 10%, they are symptoms, not successes.
+  This is a concrete demonstration of the paper's own argument for reporting four numbers, and a
+  reminder that two of them are only meaningful when the other two are healthy.
+</div>
+
+<h2>What went right</h2>
+
+<h3>Learning works</h3>
+<p>Before the collapse, individual tasks reached accuracies in the paper's own region: task 5 at
+  59.8%, task 17 at 57.0%, task 19 at 56.0%, task 9 at 49.2%. The paper's whole-run retain accuracy
+  is 55.24%. So the hypernetwork, the chunked generation and the learning objective are all doing
+  their job.</p>
+
+<h3>Forgetting hits its target exactly</h3>
+<p>Every unlearn request drove its task to exactly 10.0%, first time, every time. The forget loss
+  settles at 236,000 to 264,000 against a theoretical floor of <code>gamma &times; d</code> =
+  235,208, so the objective is not merely working but close to converged.</p>
+
+<h3>Burn-in annealing behaves as specified</h3>
+<pre>100  90  81  72  65  59  53  47  43  38  34  31</pre>
+<p>Appendix C's 10% decay with a floor of 20, over twelve unlearn requests.</p>
+
+<h3>The instrumentation held</h3>
+<p>Per-request timing, peak memory, the four JSON files, the progress bars and the cost table all
+  worked on the first full-scale run. Nothing had to be re-run to recover a number.</p>
+
+<h2>What went wrong</h2>
+
+<h3>Forgetting destroys the retained tasks</h3>
+<p>Spill per unlearn request, in order:</p>
+<pre>15.4  162.8  59.4  48.4  13.0  63.0  2.0  4.0  0.6  0.0  0.0  0.0</pre>
+<p>The trailing zeros are not improvement. By request 15 every task sits at 10%, so there is
+  nothing left to disturb. The paper's mean spill for this setting is 0.722; the <em>first</em>
+  unlearn here, with a single task to protect, did 15.4. That is twenty times the paper's whole-run
+  average before any long-history effect can be blamed.</p>
+
+<h3>The generator dies</h3>
+<p>Requests 25 to 29 are learns, and their final losses are 2.3028, 2.3027, 2.3027, 2.3026, 2.3026.
+  That number is ln(10): the network emits identical logits for every input. After the mass
+  unlearning it cannot learn a new task at all.</p>
+
+<div class="note bad">
+  <strong>This inverts the paper's second claim.</strong> Table 3 argues that unlearning
+  <em>restores</em> plasticity, 50.47% to 55.24% on Tiny ImageNet, by returning capacity. Here
+  unlearning removed plasticity entirely. Whatever the cause, saturation alleviation cannot be
+  tested on this code until it is fixed.
+</div>
+
+<h3>Same failure mode as the initialization bug, different cause</h3>
+<p>A loss pinned at ln(10) with accuracy at exactly 10.0 appeared earlier in the day from He
+  initialization on the classifier, and was fixed. It has reappeared, now caused by the forget
+  objective rather than the starting point. Worth noting as a signature: <strong>loss = 2.3026 and
+  accuracy = 10.0 to one decimal means collapse to uniform logits</strong>, and the question is
+  only what pushed it there.</p>
+
+<h2>Leading hypotheses</h2>
+<p>Untested. Listed so the next run is a decision rather than a guess.</p>
+<ul>
+  <li><strong>Gamma too strong for this implementation.</strong> In <code>forget</code> the loss is
+    <code>gamma * noise + preserve</code>, with no weight on the preservation term. The noise
+    gradient acts on all 23.5M generated values through a shared trunk. Preserve resists and
+    loses.</li>
+  <li><strong>Preservation is averaged over protected tasks.</strong>
+    <code>total / len(protected)</code> means per-task protection weakens as history grows. This
+    cannot explain the first unlearn, where there is one protected task, so at most it compounds a
+    problem that starts elsewhere.</li>
+  <li><strong>Burn-in of 100 Adam steps at 1e-3 is a large move</strong> for a shared generator.
+    The paper's scheduler is described but never specified.</li>
+</ul>
+
+<p>The experiment that separates the first from the rest is three requests over four values of
+  gamma, about ten minutes on an A100:</p>
+
+<pre>for gamma in (0.1, 0.01, 0.001, 0.0001):
+    r = run_experiment(sequence=1, backbone="resnet50", epochs=5,
+                       limit_requests=3, gamma=gamma, root=DATA, output=None)
+    print(gamma, r["numbers"]["mean_spill"], r["history"][2]["after"])</pre>
+
+<h2>The cost model</h2>
+<p>Fitted to the thirty measured requests. Time per optimizer step is linear in the number of
+  protected tasks, for both actions:</p>
+
+<pre>learn    s/step = 0.0948 + 0.0390 * protected
+forget   s/step = 0.0063 + 0.0475 * protected</pre>
+
+<p>Summed over sequence 1 this predicts 55.9 minutes against 55.9 measured, within 0.1%.</p>
+
+<p>Two things follow. The slopes agree within 22%, so <strong>once a few tasks have been learned,
+  the regularizer is the cost and the objective is noise around it</strong>: a forget step costs
+  about what a learn step costs, despite touching no data. And because cost per request grows
+  linearly with history, the cost of a whole sequence grows roughly with the square of its length.
+  The first learn took 36 s; the eighteenth took 302 s, 8.4&times; more, for identical work.</p>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Request</th><th>Protected</th><th>Steps</th><th>Seconds</th><th>s/step</th><th>Peak GiB</th></tr></thead>
+  <tbody>
+    <tr><td>first learn</td><td class="n">0</td><td class="n">395</td><td class="n">36.1</td><td class="n">0.091</td><td class="n">4.37</td></tr>
+    <tr><td>last learn</td><td class="n">17</td><td class="n">395</td><td class="n">302.0</td><td class="n">0.765</td><td class="n">7.72</td></tr>
+    <tr><td>first forget</td><td class="n">1</td><td class="n">100</td><td class="n">7.2</td><td class="n">0.072</td><td class="n">3.92</td></tr>
+    <tr><td>last forget</td><td class="n">12</td><td class="n">31</td><td class="n">19.0</td><td class="n">0.613</td><td class="n">6.07</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Peak memory grows the same way, 4.37 to 7.72 GiB, because each protected task's weights are
+  regenerated inside one graph. On a 40 GiB A100 this run had a wide margin; a longer sequence or a
+  larger backbone would not.</p>
+
+<h2>Learnings</h2>
+
+<h3>About the method</h3>
+<ul>
+  <li>Retain accuracy and forget accuracy are not independent. A collapsed model scores perfectly
+    on two of the four metrics. Always read them together.</li>
+  <li>The regularizer, not the objective, determines what a run costs. Any work on efficiency
+    should start there, which is also where the paper's stated research angle about budgeting the
+    protected set points.</li>
+  <li>The forget loss has a floor of <code>gamma &times; d</code>, which for ResNet50 is 235,208.
+    A forget loss "not going down" is expected; what matters is its distance above that floor.</li>
+</ul>
+
+<h3>About the code</h3>
+<p>Nine defects were found and fixed on the way to this run. Four were found by measurement rather
+  than by reading, which is the pattern worth keeping.</p>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Defect</th><th>Effect</th><th>Found by</th></tr></thead>
+  <tbody>
+    <tr><td>He init on the classifier</td><td>Initial loss 6.7, then permanent collapse to ln(10). The cnn backbone could not learn at all.</td><td>a failing test</td></tr>
+    <tr><td>Output filenames lacked seed and backbone</td><td>A three-seed loop wrote all three runs to one file. Two silently lost.</td><td>reading the sweep code</td></tr>
+    <tr><td>Indexing ignored the class filter</td><td>220,200 filesystem calls and 9 s before the first step, none of it reducible by any argument.</td><td>measurement</td></tr>
+    <tr><td>Frozen reference regenerated every step</td><td>Double the generator work in the regularizer, which is the dominant cost.</td><td>measurement</td></tr>
+    <tr><td>Accuracy measured twice per request</td><td>20 evaluation passes where 11 would do.</td><td>measurement</td></tr>
+    <tr><td>Setup excluded from reported time</td><td>The slowest part of a short run was the part the timer ignored.</td><td>measurement</td></tr>
+    <tr><td>Partial dataset not repaired</td><td>Told the caller to pass the flag they had just passed.</td><td>a user hitting it</td></tr>
+    <tr><td>Checkpoint guard too narrow</td><td>A gamma sweep would have resumed the previous point's model.</td><td>writing the tests</td></tr>
+    <tr><td>Protected count off by one for learns</td><td>Wrong column in the cost table.</td><td>running the new bars</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>About the process</h3>
+<p>Every failure that reached the notebook was code that had been reasoned about and not executed:
+  a missing <code>importlib.invalidate_caches()</code>, a dataset path on a network drive, a tuple
+  unpack of a dict, a filename that only existed after one particular run. All of them reproduce in
+  plain Python in seconds. <code>scripts/check_guide.py</code> now executes every code block in the
+  guide, and that is the control that should have existed first.</p>
+
+<h2>What exists now</h2>
+<ul>
+  <li>One package, <code>uncle</code>, with one Tiny ImageNet loader and one class partition.</li>
+  <li>Per-request timing and peak memory, written to disk as the run goes.</li>
+  <li>Checkpointing after every request. A killed run resumes and reproduces the history it would
+    have had, exactly, on CPU.</li>
+  <li>36 checks across three test files, plus 18 executable guide blocks.</li>
+  <li>A measured cost model that predicts a full sequence within 0.1%.</li>
+</ul>
+
+<h2>Open, in order</h2>
+<ol>
+  <li>The gamma probe above. Ten minutes, and it decides whether the collapse is tuning or
+    structure.</li>
+  <li>If structural: examine the balance between the noise and preservation terms in
+    <code>forget</code>, including whether preservation should be summed rather than averaged over
+    protected tasks.</li>
+  <li>Only then the paper's experiments, since saturation alleviation and the metric comparisons
+    all need a run that retains something.</li>
+  <li>Compute planning for the full set of experiments and the research angle, using the cost model
+    above rescaled to H100.</li>
+</ol>
+
+<footer>
+  Run of 21 September 2026 on commit c6d89ce. Every figure here is measured, from
+  <code>costs_seq1_resnet50_seed0.json</code> and the run's console output, except the cost model
+  coefficients, which are a least-squares fit to those measurements, and the paper's column, which
+  is quoted from Tables 1 and 2 for sequence 1 averaged over three seeds.
+</footer>
+
+</div>
