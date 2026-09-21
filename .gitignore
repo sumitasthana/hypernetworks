@@ -1,7 +1,7 @@
 __pycache__/
 *.py[cod]
 
-# MNIST downloads on first run
+# MNIST and Tiny ImageNet download on first run
 data/
 
 # Checkpoints written by the notebook

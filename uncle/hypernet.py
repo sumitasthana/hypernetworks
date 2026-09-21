@@ -28,20 +28,27 @@ def build_target(config: Config) -> nn.Module:
     "cnn" option is a small stand-in for quick CPU runs; it has no BatchNorm,
     so it also has no per-task running statistics to carry around.
     """
+    channels = config.input_channels
+    size = config.input_size
+
     if config.backbone == "cnn":
+        side = size // 4
         target = nn.Sequential(
-            nn.Conv2d(1, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(channels, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
             nn.Conv2d(16, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
-            nn.Flatten(), nn.Linear(32 * 7 * 7, 10),
+            nn.Flatten(), nn.Linear(32 * side * side, config.classes_per_task),
         )
     else:
         builder = {"resnet18": resnet18, "resnet50": resnet50}[config.backbone]
-        target = builder(weights=None, num_classes=10)
+        target = builder(weights=None, num_classes=config.classes_per_task)
 
-        # Permuted-MNIST is one channel at 28x28. The stock 7x7 stride-2 stem
-        # with a max-pool would throw most of that away.
-        target.conv1 = nn.Conv2d(1, 64, 3, stride=1, padding=1, bias=False)
-        target.maxpool = nn.Identity()
+        # The stock 7x7 stride-2 stem plus max-pool is built for 224x224. At
+        # 28x28 (MNIST) or 64x64 (Tiny ImageNet) it throws most of the image
+        # away, so use a 3x3 stride-1 stem. Tiny ImageNet keeps the max-pool
+        # because 64x64 can afford one halving; 28x28 cannot.
+        target.conv1 = nn.Conv2d(channels, 64, 3, stride=1, padding=1, bias=False)
+        if size <= 32:
+            target.maxpool = nn.Identity()
 
     return target.to(config.torch_device).requires_grad_(False)
 

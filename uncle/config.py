@@ -18,6 +18,32 @@ FIVE_TASKS_SEQUENCES = {
     3: "L0 L2 U0 L4 L3 U2 U4",
 }
 
+# Tiny-ImageNet runs 30 requests over 20 tasks, twice as long as the rest.
+TINY_IMAGENET_SEQUENCES = {
+    1: "L3 L0 U3 L9 L5 L17 L1 L7 L14 L15 L19 U17 U7 L6 U15 U9 L12 L4 U5 U4 "
+       "U6 U0 U1 U14 U12 L13 L18 L2 L11 L8",
+    2: "L12 L13 L5 L8 L2 U8 L14 U13 U5 U2 L3 U3 L16 U12 L11 U16 L7 L15 L10 L19 "
+       "L9 U14 U7 L18 L6 L1 L0 L4 U6 L17",
+    3: "L2 L7 U2 L18 L12 U7 U18 L16 L0 U16 U0 L13 L4 U12 U13 L9 L19 U19 U4 L10 "
+       "L14 L5 U5 U10 L11 L1 U1 L17 L6 L3",
+}
+
+# Per-dataset defaults from the paper: the request sequences, how many tasks
+# the sequences address, and beta (Appendix C: 1e-1 for Permuted MNIST and
+# CIFAR-100, 1e-2 for Tiny-ImageNet, 1e-3 for 5-Tasks).
+
+
+DATASETS = {
+    "permuted_mnist": {
+        "channels": 1, "size": 28, "task_count": 10, "beta": 0.1,
+        "sequences": PERMUTED_MNIST_SEQUENCES,
+    },
+    "tiny_imagenet": {
+        "channels": 3, "size": 64, "task_count": 20, "beta": 0.01,
+        "sequences": TINY_IMAGENET_SEQUENCES,
+    },
+}
+
 
 def parse_sequence(text: str) -> tuple[tuple[str, str], ...]:
     """Turn "L1 L0 U1" into (("learn", "1"), ("learn", "0"), ("forget", "1"))."""
@@ -25,6 +51,21 @@ def parse_sequence(text: str) -> tuple[tuple[str, str], ...]:
     return tuple(
         (actions[token[0]], token[1:]) for token in text.split()
     )
+
+
+def dataset_defaults(dataset: str, sequence: int) -> dict:
+    """The paper's task list, request sequence and beta for one dataset.
+
+    Sequence numbers are the rows of Table 4. The task list is sized to the
+    sequence: Permuted MNIST names tasks 0-9, Tiny-ImageNet names 0-19.
+    """
+    settings = DATASETS[dataset]
+    return {
+        "dataset": dataset,
+        "tasks": tuple(str(index) for index in range(settings["task_count"])),
+        "requests": parse_sequence(settings["sequences"][sequence]),
+        "beta": settings["beta"],
+    }
 
 
 def _default_device() -> str:
@@ -40,10 +81,18 @@ class Config:
     GPU. For a quick CPU run pass backbone="cnn" with fewer chunks and tasks.
     """
 
+    dataset: str = "permuted_mnist"   # see DATASETS
     tasks: tuple[str, ...] = tuple(str(index) for index in range(10))
     requests: tuple[tuple[str, str], ...] = parse_sequence(
         PERMUTED_MNIST_SEQUENCES[1]
     )
+
+    # Tiny ImageNet only. The paper gives 10 tasks of 10 classes but never says
+    # which classes or in what order, so the split rule is a knob here.
+    # "sorted" chunks the wnids in alphabetical order, "random" shuffles them
+    # first using `seed`.
+    classes_per_task: int = 10
+    class_order: str = "sorted"
 
     backbone: str = "resnet18"        # "resnet18", "resnet50", or "cnn"
     seed: int = 0
@@ -91,6 +140,12 @@ class Config:
                     raise ValueError(f"Task {task} is forgotten twice.")
                 forgotten.add(task)
 
+        if self.dataset not in DATASETS:
+            raise ValueError(f"Unknown dataset: {self.dataset}")
+        if self.class_order not in ("sorted", "random"):
+            raise ValueError(f"Unknown class_order: {self.class_order}")
+        if self.classes_per_task < 2:
+            raise ValueError("classes_per_task must be at least 2.")
         if self.backbone not in ("resnet18", "resnet50", "cnn"):
             raise ValueError(f"Unknown backbone: {self.backbone}")
         if self.chunks < 1:
@@ -99,6 +154,14 @@ class Config:
             raise ValueError("hidden must name at least one layer width.")
         if not 0 < self.burn_in_decay <= 1:
             raise ValueError("burn_in_decay must be in (0, 1].")
+
+    @property
+    def input_channels(self) -> int:
+        return DATASETS[self.dataset]["channels"]
+
+    @property
+    def input_size(self) -> int:
+        return DATASETS[self.dataset]["size"]
 
     @property
     def torch_device(self) -> torch.device:

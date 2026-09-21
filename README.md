@@ -1,4 +1,4 @@
-# UnCLe on Permuted MNIST
+# UnCLe on Permuted MNIST and Tiny ImageNet
 
 A reimplementation of [An Unlearning Framework for Continual
 Learning](https://arxiv.org/abs/2509.17530) (Adhikari, Kumaravelu, Srijith).
@@ -23,7 +23,15 @@ For a quick check without a GPU, swap in the small stand-in network:
 
 ```bash
 python main.py --backbone cnn --chunks 32 --epochs 1
-python tests/test_uncle.py         # twelve checks, seconds, no download
+python tests/test_uncle.py         # fourteen checks, seconds, no download
+```
+
+Tiny ImageNet downloads itself on first use (about 240 MB) and wants a GPU. It
+runs the paper's 30-request sequences over 20 tasks, with beta 0.01:
+
+```bash
+python main.py --dataset tiny_imagenet --backbone resnet50
+python main.py --dataset tiny_imagenet --sequence 3
 ```
 
 The paper reports 96.87% retain accuracy and 10.00% forget accuracy for the
@@ -34,7 +42,7 @@ default setting, so those are the numbers to check against.
 | File | What it holds |
 | --- | --- |
 | `uncle/config.py` | Every knob, plus validation of the request list |
-| `uncle/data.py` | Permuted MNIST, one fixed pixel shuffle per task |
+| `uncle/data.py` | Permuted MNIST and Tiny ImageNet task streams |
 | `uncle/hypernet.py` | The target CNN and the network that generates its weights |
 | `uncle/trainer.py` | `learn`, `forget`, and the regularizer they share |
 | `uncle/metrics.py` | Retain accuracy, forget accuracy, spill, relapse |
@@ -106,17 +114,38 @@ one is not.
 | --- | --- |
 | Kaiming init with output scaling | Hyperfan initialization |
 | Constant learning rate | Adam with a scheduler, unspecified |
-| Permuted-MNIST only | Also 5-Tasks, CIFAR-100, Tiny-ImageNet |
+| Permuted MNIST and Tiny ImageNet | Also 5-Tasks and CIFAR-100 |
 
 Everything else follows the paper: ResNet18 or ResNet50 generated in 200
 chunks, 32-number task and chunk codes, one head per parameter type, per-task
 BatchNorm statistics, beta 0.1, gamma 0.01, 10 noise samples, and a burn-in of
 100 annealed by 10% per unlearn down to a floor of 20.
 
-Two settings the paper leaves open, decided here: how the 200 chunks are
-shared between the heads (one each, then in proportion to size), and what
-happens to a forgotten task's BatchNorm statistics (nothing, since eq. 3
-covers generated parameters only).
+Three settings the paper leaves open, decided here: how the 200 chunks are
+shared between the heads (one each, then in proportion to size), what happens
+to a forgotten task's BatchNorm statistics (nothing, since eq. 3 covers
+generated parameters only), and which Tiny ImageNet classes form each task.
+
+## Tiny ImageNet tasks
+
+The paper says 10 tasks of 10 classes each, and 20 tasks of 10 classes for the
+long 30-request run. It never says which classes go together or in what order,
+so that is a knob here rather than a claim:
+
+```bash
+python main.py --dataset tiny_imagenet --class-order sorted   # default
+python main.py --dataset tiny_imagenet --class-order random   # uses --seed
+```
+
+`sorted` cuts the 200 wnids into consecutive blocks of ten in alphabetical
+order, so task 0 is classes 0-9. `random` shuffles them first. The groups are
+always disjoint. Twenty tasks covers all 200 classes; drop to ten tasks in
+`Config` and only the first 100 are used.
+
+All three of Table 4's Tiny-ImageNet request sequences are in
+`uncle/config.py`: 30 requests each over tasks 0-19. `--sequence` picks the
+row, and the task count and beta follow the dataset, so `--dataset
+tiny_imagenet` gives 20 tasks and beta 0.01 without any other flag.
 
 With ResNet18 the heads come out as 195 chunks for ordinary weights, 4 for
 residual connections and 1 for BatchNorm, and the hypernetwork is 56,082,990

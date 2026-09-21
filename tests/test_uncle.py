@@ -17,6 +17,7 @@ from torch.utils.data import Dataset
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from uncle import Config, HyperNetwork, UnCLe, build_target  # noqa: E402
+from uncle.data import _class_groups  # noqa: E402
 from uncle.metrics import relapse, spill, summary  # noqa: E402
 
 
@@ -228,6 +229,38 @@ def test_sequences_parse_to_the_papers_requests():
     assert sum(1 for action, _ in requests if action == "forget") == 5
 
 
+def test_tiny_imagenet_sequences_match_the_paper():
+    """Table 4's Tiny-ImageNet rows: 30 requests over 20 tasks, all three valid.
+
+    Building a Config runs the request-list checks: nothing learned twice,
+    nothing forgotten before it is learned or forgotten twice. A typo in the
+    transcription almost certainly trips one of them.
+    """
+    from uncle.config import TINY_IMAGENET_SEQUENCES, dataset_defaults
+
+    for number in (1, 2, 3):
+        settings = dataset_defaults("tiny_imagenet", number)
+        config = Config(**settings, device="cpu")
+
+        assert len(config.requests) == 30
+        assert len(config.tasks) == 20
+        assert config.beta == 0.01       # Appendix C: 1e-2 for Tiny-ImageNet
+
+        tokens = TINY_IMAGENET_SEQUENCES[number].split()
+        assert max(int(token[1:]) for token in tokens) == 19
+
+    # Spot-check the first few of each row against the printed table.
+    assert dataset_defaults("tiny_imagenet", 1)["requests"][:3] == (
+        ("learn", "3"), ("learn", "0"), ("forget", "3"),
+    )
+    assert dataset_defaults("tiny_imagenet", 2)["requests"][:3] == (
+        ("learn", "12"), ("learn", "13"), ("learn", "5"),
+    )
+    assert dataset_defaults("tiny_imagenet", 3)["requests"][:3] == (
+        ("learn", "2"), ("learn", "7"), ("forget", "2"),
+    )
+
+
 def test_resnet_target_keeps_buffers_per_task():
     """BatchNorm statistics are not generated, so each task holds its own."""
     config = Config(
@@ -268,6 +301,41 @@ def test_resnet_target_keeps_buffers_per_task():
     assert torch.isfinite(scores).all()
     # Train mode must have moved this task's statistics.
     assert not torch.equal(before, uncle.task_buffers["A"]["bn1.running_mean"])
+
+
+def test_tiny_imagenet_split_is_disjoint_and_follows_the_rule():
+    """No image belongs to two tasks, and the split rule is the knob it claims."""
+    config = Config(dataset="tiny_imagenet", device="cpu",
+                    requests=(("learn", "0"),))
+
+    sorted_groups = _class_groups(200, config)
+    assert len(sorted_groups) == 10
+    assert all(len(group) == 10 for group in sorted_groups)
+    assert sorted_groups[0] == list(range(10))
+    assert sorted_groups[9] == list(range(90, 100))
+
+    flat = [index for group in sorted_groups for index in group]
+    assert len(set(flat)) == len(flat)
+
+    shuffled = _class_groups(200, Config(dataset="tiny_imagenet", device="cpu",
+                                         class_order="random",
+                                         requests=(("learn", "0"),)))
+    assert shuffled != sorted_groups
+    assert len({index for group in shuffled for index in group}) == 100
+
+    # The paper's long-sequence run: 20 tasks covering all 200 classes.
+    wide = Config(dataset="tiny_imagenet", device="cpu",
+                  tasks=tuple(str(index) for index in range(20)),
+                  requests=(("learn", "17"),))
+    assert len({index for group in _class_groups(200, wide) for index in group}) == 200
+
+    # Asking for more classes than exist has to fail loudly, not silently drop tasks.
+    try:
+        _class_groups(50, config)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("a too-small dataset should raise")
 
 
 def main():

@@ -7,12 +7,17 @@ The defaults are the paper's Permuted-MNIST setting and need a GPU:
 For a quick check on a CPU, use the small stand-in network:
 
     python main.py --backbone cnn --chunks 32 --epochs 1 --sequence 1
+
+Tiny ImageNet downloads on first use (about 240 MB) and needs a GPU. It runs
+the paper's 30-request sequences over 20 tasks:
+
+    python main.py --dataset tiny_imagenet --backbone resnet50
 """
 
 import argparse
 
 from uncle import Config, run, spill, summary
-from uncle.config import PERMUTED_MNIST_SEQUENCES, parse_sequence
+from uncle.config import dataset_defaults
 
 
 def show(record: dict) -> None:
@@ -31,27 +36,39 @@ def parse_args() -> Config:
     defaults = Config()
     parser = argparse.ArgumentParser(description=__doc__)
 
+    parser.add_argument("--dataset", default=defaults.dataset,
+                        choices=("permuted_mnist", "tiny_imagenet"))
+    parser.add_argument("--class-order", default=defaults.class_order,
+                        choices=("sorted", "random"),
+                        help="Tiny ImageNet only: how classes are grouped into tasks")
     parser.add_argument("--backbone", default=defaults.backbone,
                         choices=("resnet18", "resnet50", "cnn"))
     parser.add_argument("--sequence", type=int, default=1, choices=(1, 2, 3),
                         help="Which request sequence from the paper's Table 4")
+    parser.add_argument("--beta", type=float, default=None,
+                        help="Defaults to the paper's value for the dataset")
     parser.add_argument("--epochs", type=int, default=defaults.epochs)
     parser.add_argument("--chunks", type=int, default=defaults.chunks)
     parser.add_argument("--batch-size", type=int, default=defaults.batch_size)
-    parser.add_argument("--beta", type=float, default=defaults.beta)
     parser.add_argument("--gamma", type=float, default=defaults.gamma)
     parser.add_argument("--burn-in", type=int, default=defaults.burn_in)
     parser.add_argument("--seed", type=int, default=defaults.seed)
     parser.add_argument("--device", default=defaults.device)
 
     arguments = parser.parse_args()
+
+    # Table 4's sequences, task count and beta for the chosen dataset.
+    settings = dataset_defaults(arguments.dataset, arguments.sequence)
+    if arguments.beta is not None:
+        settings["beta"] = arguments.beta
+
     return Config(
-        requests=parse_sequence(PERMUTED_MNIST_SEQUENCES[arguments.sequence]),
+        **settings,
+        class_order=arguments.class_order,
         backbone=arguments.backbone,
         epochs=arguments.epochs,
         chunks=arguments.chunks,
         batch_size=arguments.batch_size,
-        beta=arguments.beta,
         gamma=arguments.gamma,
         burn_in=arguments.burn_in,
         seed=arguments.seed,
@@ -62,10 +79,12 @@ def parse_args() -> Config:
 def main() -> None:
     config = parse_args()
 
-    print(f"backbone: {config.backbone}   chunks: {config.chunks}   "
-          f"epochs: {config.epochs}   device: {config.device}")
+    print(f"dataset: {config.dataset}   backbone: {config.backbone}   "
+          f"chunks: {config.chunks}   epochs: {config.epochs}   "
+          f"beta: {config.beta}   device: {config.device}")
     print("requests: " + " ".join(
-        f"{action[0].upper()}{task}" for action, task in config.requests
+        f"{'L' if action == 'learn' else 'U'}{task}"
+        for action, task in config.requests
     ))
     print()
 
