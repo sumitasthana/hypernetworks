@@ -669,8 +669,8 @@ GPU time         0.12 hours</code></pre></figure>
 
 <figure class="code"><pre><code>result = run_experiment(sequence=1, backbone="resnet50", epochs=5, root=DATA, output=SAVE)
 
-result["totals"]["peak_memory_bytes"]     # the binding constraint
-result["totals"]["gpu_hours"]
+result["totals"]                          # setup, per action, peak memory
+result["totals"]["peak_memory_bytes"]     # the binding constraint, None on CPU
 result["costs"]                           # one row per request
 result["environment"]["gpu"]              # and torch version, commit, sizes
 result["environment"]["hypernetwork_parameters"]</code></pre></figure>
@@ -719,8 +719,13 @@ result["environment"]["hypernetwork_parameters"]</code></pre></figure>
   annealed <code>burn_in</code> that forget request used.</p>
 
 <p>Both are plain JSON, so a finished or interrupted run reads back without rerunning anything:</p>
-<figure class="code"><pre><code>import json, pandas as pd
-history = json.load(open(f"{SAVE}/history_seq1_resnet50_seed0.json"))
+<figure class="code"><pre><code>import glob, json, pandas as pd
+
+# Pick whichever run is there rather than naming one: the file carries the
+# sequence, backbone and seed, so the name changes with the settings.
+paths = sorted(glob.glob(f"{SAVE}/history_*.json"))
+print(paths)
+history = json.load(open(paths[-1]))
 pd.DataFrame([{ "i": r["index"], "action": r["action"], "task": r["task"],
                 **{f"acc_{t}": v for t, v in r["after"].items()} } for r in history])</code></pre></figure>
 
@@ -887,9 +892,12 @@ for seed in (0, 1, 2):
   jagged lines: their forgotten tasks climb back up as later tasks are learned, and their retained
   tasks dip every time something else is unlearned. Seeing one clean staircase is more convincing than
   any table.</p>
-<figure class="code"><pre><code>import json, matplotlib.pyplot as plt
+<figure class="code"><pre><code>import glob, json, matplotlib.pyplot as plt
 
-history = json.load(open(f"{SAVE}/history_seq1_resnet50_seed0.json"))
+paths = sorted(glob.glob(f"{SAVE}/history_*.json"))
+history = json.load(open(paths[-1]))
+
+# Has to be a task this run actually reached; a short run may not have it.
 task = "0"
 xs = [r["index"] for r in history if task in r["after"]]
 ys = [r["after"][task] for r in history if task in r["after"]]
@@ -1072,7 +1080,9 @@ print("on tasks", kept)</code></pre></figure>
 
 print(out["totals"]["forget"])   # requests, total, mean and slowest seconds
 print(out["totals"]["learn"])    # the same for learning, to compare against
-print(out["totals"]["peak_memory_bytes"] / 2 ** 30, "GiB peak")</code></pre></figure>
+
+peak = out["totals"]["peak_memory_bytes"]        # None when there is no GPU
+print(f"peak {peak / 2 ** 30:.2f} GiB" if peak else "peak memory: no GPU")</code></pre></figure>
 <p><span class="lead">Watch for</span> The comparison is only fair on the same GPU. The paper's
   numbers are from a V100; a T4 is slower, so reproduce the <em>shape</em>, unlearning much cheaper
   than learning and getting cheaper as annealing kicks in, rather than the absolute seconds. The

@@ -221,7 +221,8 @@ def describe_costs(totals) -> str:
                 f"{part['total_seconds'] / 60:>6.1f} min total, "
                 f"{part['mean_seconds']:>6.1f} s mean, "
                 f"{part['slowest_seconds']:>6.1f} s slowest")
-    if "peak_memory_bytes" in totals:
+    # The key is always there; its value is None when there was no GPU.
+    if totals.get("peak_memory_bytes"):
         lines.append(f"peak GPU memory  {totals['peak_memory_bytes'] / 2 ** 30:.2f} GiB")
         lines.append(f"GPU time         {totals['gpu_hours']:.2f} hours")
     return "\n".join(lines)

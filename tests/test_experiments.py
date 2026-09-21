@@ -95,8 +95,10 @@ class TelemetryTests(unittest.TestCase):
         self.assertEqual(totals["forget"]["requests"], 1)
         self.assertGreaterEqual(totals["learn"]["slowest_seconds"],
                                 totals["learn"]["mean_seconds"])
-        # No GPU here, so there is no peak memory to report.
-        self.assertNotIn("peak_memory_bytes", totals)
+        # The key is always present so callers need not branch on hardware;
+        # None is what "no GPU" looks like.
+        self.assertIn("peak_memory_bytes", totals)
+        self.assertIsNone(totals["peak_memory_bytes"])
 
     def test_the_printed_forms_hold_together(self):
         log = self.rows()

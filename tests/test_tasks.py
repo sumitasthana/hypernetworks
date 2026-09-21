@@ -70,6 +70,23 @@ class TaskTests(unittest.TestCase):
                 load_partition(root, path)
 
 
+class GuideTests(unittest.TestCase):
+    """The guide's code has to at least parse. Running it is check_guide.py."""
+
+    def test_every_python_block_in_the_guide_parses(self):
+        import ast
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+        from check_guide import COLAB_ONLY, SAMPLES, guide_blocks
+
+        blocks = guide_blocks()
+        self.assertGreater(len(blocks), 15)
+        for index, block in enumerate(blocks):
+            if index in SAMPLES:
+                continue
+            with self.subTest(block=index):
+                ast.parse(block)      # COLAB_ONLY blocks are valid Python too
+
+
 class IndexingTests(unittest.TestCase):
     """Only the requested classes get indexed, and labels stay global."""
 

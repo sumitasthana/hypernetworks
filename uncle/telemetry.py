@@ -177,9 +177,12 @@ class RunLog:
                 "mean_seconds": sum(seconds) / len(rows),
                 "slowest_seconds": max(seconds),
             }
+        # Always present, so a caller reading it does not have to know
+        # whether the run had a GPU. None means it did not.
+        peaks = [row["peak_memory_bytes"] for row in self.rows
+                 if row["peak_memory_bytes"] is not None]
+        report["peak_memory_bytes"] = max(peaks) if peaks else None
         if self.on_gpu and self.rows:
-            peaks = [row["peak_memory_bytes"] for row in self.rows]
-            report["peak_memory_bytes"] = max(peaks)
             report["gpu_hours"] = report["total_seconds"] / 3600
         return report
 
