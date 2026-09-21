@@ -80,7 +80,8 @@ def run_experiment(sequence=1, limit_requests=None, max_images=None,
 
     `on_request` is called with each record as it completes, on top of the
     printing `verbose` does, so a notebook can plot as the run goes. `config`
-    takes a prepared Config and ignores the sequence and override arguments.
+    takes a prepared Config and ignores the override arguments; `sequence` then
+    only labels the output files, so pass the one the config came from.
     `download` fetches the dataset when it is missing, which a fresh Colab
     runtime needs.
     """
@@ -99,8 +100,13 @@ def run_experiment(sequence=1, limit_requests=None, max_images=None,
     if output is not None:
         output = Path(output)
         output.mkdir(parents=True, exist_ok=True)
-        history_path = output / f"history_sequence{sequence}.json"
-        summary_path = output / f"summary_sequence{sequence}.json"
+        # The stem carries what a sweep varies, so a loop over seeds or
+        # backbones does not write every run to the same file. Sweeping
+        # anything else (beta, gamma) still collides: use output=None and
+        # keep the returned numbers, or give each point its own directory.
+        stem = f"seq{sequence}_{config.backbone}_seed{config.seed}"
+        history_path = output / f"history_{stem}.json"
+        summary_path = output / f"summary_{stem}.json"
 
     if verbose:
         print(f"sequence {sequence}: {len(config.requests)} requests over "
