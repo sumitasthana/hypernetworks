@@ -640,21 +640,25 @@ sequence 1:  10%|#         | 3/30 [06:51&lt;61:44, 137.2s/step, 181s, 4.2 GiB]</
   forgetting are very different jobs, so they are reported separately rather than averaged into one
   meaningless number. A finished run prints this:</p>
 
-<figure class="code"><pre><code>  #  action  task prot  steps   seconds  s/step  peak GiB
------------------------------------------------------------
-  0  learn      3    0    390     181.4   0.465      4.21
-  1  learn      0    1    390     214.7   0.551      5.83
-  2  forget     3    1    100      38.2   0.382      5.86
+<figure class="code"><pre><code>  #  action task prot  steps   seconds  s/step  peak GiB
+--------------------------------------------------------
+  0  learn     3    0    390     181.4   0.465      4.21
+  1  learn     0    1    390     214.7   0.551      5.83
+  2  forget    3    1    100      38.2   0.382      5.86
 
-total time       7.2 min over 3 requests
-learn requests    2    6.6 min total,  198.1 s mean,  214.7 s slowest
-forget requests   1    0.6 min total,   38.2 s mean,   38.2 s slowest
+total time       7.4 min, of which 11s was setup
+requests         7.2 min over 3 requests
+learn requests    2     6.6 min total,  198.1 s mean,  214.7 s slowest
+forget requests   1     0.6 min total,   38.2 s mean,   38.2 s slowest
 peak GPU memory  5.86 GiB
 GPU time         0.12 hours</code></pre></figure>
 
 <p>The numbers above are made up to show the layout, not measured. The columns that matter:</p>
 
 <ul class="plain">
+  <li><strong>setup</strong> is dataset indexing and model construction, before the first request
+    and before any bar appears. It used to be excluded from the reported time, which made the
+    slowest part of a short run the part the timer ignored.</li>
   <li><strong>prot</strong> is how many tasks the regularizer had to protect during that request.
     This is the column that explains the other two. Every protected task gets its weights regenerated
     inside the same graph, so both time and memory climb as the sequence goes on.</li>
@@ -731,10 +735,12 @@ pd.DataFrame([{ "i": r["index"], "action": r["action"], "task": r["task"],
 
 <h2>Five things that will bite</h2>
 <ul class="plain">
-  <li><strong>Memory grows with history.</strong> The regularizer regenerates every protected task's
-    weights in one graph, so by request 29 it is holding nineteen full sets of ResNet50 parameters at
-    once. If a late request dies with a CUDA out-of-memory error while early ones were fine, that is
-    why. Fewer <code>chunks</code>, a smaller <code>batch_size</code>, or ResNet18 are the levers.</li>
+  <li><strong>Memory grows with history.</strong> The regularizer holds every protected task's
+    weights in one graph, so by request 29 that is nineteen full sets of ResNet50 parameters, plus
+    the frozen reference for each, which is now generated once per request and kept rather than
+    rebuilt every step. That trade buys a large speed-up at the cost of more resident memory. If a
+    late request dies with a CUDA out-of-memory error while early ones were fine, that is why.
+    Fewer <code>chunks</code>, a smaller <code>batch_size</code>, or ResNet18 are the levers.</li>
   <li><strong>Data loading is single-threaded.</strong> The loaders inside <code>uncle/trainer.py</code>
     use the default of zero workers, so JPEG decoding happens on the main process. At 5,000 images per
     task it is probably not the bottleneck, but if the GPU looks idle, that is the first place to
@@ -1147,6 +1153,24 @@ print(f"peak {peak / 2 ** 30:.2f} GiB" if peak else "peak memory: no GPU")</code
 </ul>
 
 </section>
+
+<h2>If a run seems stuck</h2>
+<p><code>docs/why-the-small-run-is-slow.html</code> in the repository is a diagnosis of where the
+  time goes, written against this code and measured on it. It has a table that maps what you last
+  saw on screen to the phase that is probably running, which is the fastest way to tell a slow run
+  from a hung one.</p>
+
+<p>The costs it found are fixed: dataset setup for four tasks went from 220,200 filesystem calls and
+  nine seconds to 4,120 and under half a second, the regularizer no longer rebuilds its frozen
+  reference every step, and each request no longer measures accuracy that the previous request
+  already measured. The reasoning is still worth reading, because the same shapes will come back.</p>
+
+<p>To check the guide itself still runs:</p>
+
+<figure class="code"><pre><code>python scripts/check_guide.py</code></pre></figure>
+
+<p>It executes every code block on this page with the settings clamped small, on a CPU, in a few
+  minutes. It verifies that the code runs, not that the numbers mean anything.</p>
 
 <footer class="end">
   Reimplementation of <a href="https://arxiv.org/abs/2509.17530">An Unlearning Framework for Continual

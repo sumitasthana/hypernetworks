@@ -47,6 +47,15 @@ SAMPLES = {4, 11, 12}
 #: Blocks that only make sense inside Colab: git clone, drive.mount, GPU name.
 COLAB_ONLY = {0, 1, 2}
 
+#: Blocks written as shell commands rather than Python. Matched on content
+#: rather than position, so adding a block does not silently renumber a set.
+SHELL = re.compile(r"^\s*[!$]|^\s*(python|pip|git|cd)\s")
+
+
+def is_shell(block):
+    first = next((line for line in block.splitlines() if line.strip()), "")
+    return bool(SHELL.match(first))
+
 SMALL = dict(backbone="cnn", chunks=8, epochs=1, burn_in=5, burn_in_min=5,
              limit_requests=3, max_images=100, progress=False, verbose=False)
 
@@ -98,7 +107,7 @@ def main():
 
     ok, failed = [], []
     for i, code in enumerate(blocks):
-        if i in SAMPLES or i in COLAB_ONLY:
+        if i in SAMPLES or i in COLAB_ONLY or is_shell(code):
             continue
         try:
             exec(compile(code, f"<block {i}>", "exec"), env)
