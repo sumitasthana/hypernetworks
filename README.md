@@ -98,6 +98,12 @@ the history, the four numbers, the per-request costs, and the environment it
 ran in, down to the git commit. The history and the costs are rewritten after
 every request, so a long run can be watched and survives a crash.
 
+It also writes a checkpoint after every request, holding the hypernetwork, the
+per-task batch-norm statistics, the loop's bookkeeping and the random number
+generator's state. Start the same run again and it continues from the last
+finished request, making the same draws it would have made had it never
+stopped. Pass `checkpoint=False` to skip it, or `resume=False` to start over.
+
 `docs/colab_guide.html` is the walkthrough: setup cells, worked examples, and
 every experiment in the paper with what to look for.
 

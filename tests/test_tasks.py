@@ -76,13 +76,13 @@ class GuideTests(unittest.TestCase):
     def test_every_python_block_in_the_guide_parses(self):
         import ast
         sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-        from check_guide import SAMPLES, guide_blocks, is_shell
+        from check_guide import guide_blocks, is_shell
 
         blocks = guide_blocks()
         self.assertGreater(len(blocks), 15)
         checked = 0
         for index, block in enumerate(blocks):
-            if index in SAMPLES or is_shell(block):
+            if block is None or is_shell(block):
                 continue
             with self.subTest(block=index):
                 ast.parse(block)      # Colab-only blocks are valid Python too

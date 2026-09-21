@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 import torch
 
+from . import checkpoint as checkpointing
 from .config import Config
 from .data import build_tasks
 from .hypernet import HyperNetwork, build_target
@@ -16,6 +17,9 @@ def run(
     tasks: dict | None = None,
     on_start: Callable[[dict], None] | None = None,
     progress: bool = False,
+    checkpoint_path=None,
+    resume: bool = True,
+    on_checkpoint: Callable[[dict], None] | None = None,
 ) -> list[dict]:
     """Work through config.requests and return one record per request.
 
@@ -31,6 +35,11 @@ def run(
     `on_start` is called once with the built target, hypernetwork and tasks,
     before the first request. It exists so a caller can record what it is about
     to run, sizes included, without building any of it a second time.
+
+    `checkpoint_path` saves the run after every request and, with `resume`,
+    picks up an existing checkpoint instead of starting over. Resuming skips
+    the requests already in the checkpoint's history. `on_checkpoint` is called
+    with the state about to be written, so a caller can add its own fields.
     """
     torch.manual_seed(config.seed)
 
@@ -46,10 +55,25 @@ def run(
     history: list[dict] = []
     seen: list[str] = []
     forgotten: list[str] = []
-
     previous: dict[str, float] = {}
+    done = 0
+
+    saved = (checkpointing.load(checkpoint_path, config)
+             if checkpoint_path is not None and resume else None)
+    if saved is not None:
+        done = checkpointing.restore(saved, hypernet=hypernet, uncle=uncle)
+        history = saved["history"]
+        seen, forgotten = saved["seen"], saved["forgotten"]
+        previous = saved["previous"]
+        if on_start is not None:
+            on_start({"config": config, "target": target, "hypernet": hypernet,
+                      "tasks": tasks, "uncle": uncle, "resumed_after": done,
+                      "history": list(history), "costs": saved["costs"],
+                      "setup_seconds": saved["setup_seconds"]})
 
     for index, (action, task) in enumerate(config.requests):
+        if index < done:
+            continue        # already in the checkpoint's history
         # Nothing touches the model between requests, so the accuracies taken
         # after the last one are still current. Measuring them again doubled
         # the evaluation work for an identical answer.
@@ -87,5 +111,18 @@ def run(
 
         if on_request is not None:
             on_request(record)
+
+        # After the callback, so the checkpoint carries whatever telemetry the
+        # callback recorded, but inside the loop so the request is never lost.
+        if checkpoint_path is not None:
+            extra = {"costs": [], "setup_seconds": 0.0}
+            if on_checkpoint is not None:
+                on_checkpoint(extra)
+            checkpointing.save(
+                checkpoint_path, config=config, hypernet=hypernet, uncle=uncle,
+                history=history, seen=seen, forgotten=forgotten,
+                previous=previous, costs=extra["costs"],
+                setup_seconds=extra["setup_seconds"],
+            )
 
     return history

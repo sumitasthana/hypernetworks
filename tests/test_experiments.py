@@ -18,8 +18,11 @@ are true and reliable: the plumbing, and what forgetting does to the weights.
 300 images reaches about 30%, so the architecture and the data are fine.
 """
 
+from dataclasses import replace
+import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -198,6 +201,74 @@ class RequestLoopTests(unittest.TestCase):
                         "training loss never fell below chance-level cross-entropy")
         self.assertGreater(history[0]["after"]["0"], CHANCE,
                            "learning task 0 did not beat chance")
+
+
+class Killed(Exception):
+    """Stands in for a runtime that goes away mid-run."""
+
+
+@unittest.skipUnless(DEFAULT_ROOT.exists(), f"No dataset at {DEFAULT_ROOT}")
+class CheckpointTests(unittest.TestCase):
+    def config(self):
+        return small_config(tasks=("0", "3", "9"),
+                            requests=parse_sequence("L3 L0 U3 L9"), epochs=1)
+
+    def run_to(self, output, stop_after=None, **kwargs):
+        def die(record):
+            if record["index"] == stop_after:
+                raise Killed
+
+        torch.manual_seed(0)
+        return run_experiment(config=self.config(), max_images=100, output=output,
+                              on_request=die if stop_after is not None else None,
+                              verbose=False, progress=False, **kwargs)
+
+    def test_a_resumed_run_matches_one_that_was_never_stopped(self):
+        with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
+            whole = self.run_to(a)
+
+            with self.assertRaises(Killed):
+                self.run_to(b, stop_after=1)
+
+            # A different seed here must lose to the checkpoint's saved state.
+            torch.manual_seed(999)
+            resumed = run_experiment(config=self.config(), max_images=100,
+                                     output=b, verbose=False, progress=False)
+
+        self.assertEqual(len(resumed["history"]), 4)
+        self.assertEqual(resumed["history"], whole["history"])
+        self.assertEqual(resumed["numbers"], whole["numbers"])
+        # The timings from before the restart come back too.
+        self.assertEqual(len(resumed["costs"]), 4)
+
+    def test_the_file_on_disk_keeps_the_requests_from_before_the_restart(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(Killed):
+                self.run_to(tmp, stop_after=1)
+            run_experiment(config=self.config(), max_images=100, output=tmp,
+                           verbose=False, progress=False)
+            saved = json.loads(
+                (Path(tmp) / "history_seq1_cnn_seed0.json").read_text())
+        self.assertEqual(len(saved), 4)
+
+    def test_a_checkpoint_of_a_different_run_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(Killed):
+                self.run_to(tmp, stop_after=1)
+            # The sequence, backbone and seed are all in the file name, so
+            # those can never collide. The request list can: same name, a
+            # different run. That is the case the guard is for.
+            other = replace(self.config(),
+                            requests=parse_sequence("L3 L0 U3"))
+            with self.assertRaises(ValueError) as caught:
+                run_experiment(config=other, max_images=100, output=tmp,
+                               verbose=False, progress=False)
+        self.assertIn("different run", str(caught.exception))
+
+    def test_it_can_be_turned_off(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.run_to(tmp, checkpoint=False)
+            self.assertFalse((Path(tmp) / "checkpoint_seq1_cnn_seed0.pt").exists())
 
 
 @unittest.skipUnless(DEFAULT_ROOT.exists(), f"No dataset at {DEFAULT_ROOT}")

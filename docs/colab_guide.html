@@ -445,7 +445,7 @@ result = run_experiment(
 </div>
 
 <p>You get one line per request as it lands:</p>
-<figure class="code"><pre><code>sequence 1: 5 requests over 4 tasks, backbone cnn, 32 chunks, beta 0.01, gamma 0.01, device cuda
+<figure class="code"><pre class="sample"><code>sequence 1: 5 requests over 4 tasks, backbone cnn, 32 chunks, beta 0.01, gamma 0.01, device cuda
 [ 0] learn  task 3  loss=2.2814  3:14.0
 [ 1] learn  task 0  loss=2.2537  3:11.3 0:16.7
 [ 2] forget task 3  loss=0.0091 burn_in=100  3:10.0 0:16.3
@@ -510,6 +510,50 @@ print(result["totals"])       # seconds per action, peak GPU memory</code></pre>
   then multiply by thirty. A T4 session has a limit, and if one learn request takes forty minutes the
   full sequence will not finish inside it. Drop to <code>backbone="resnet18"</code>, fewer
   <code>epochs</code>, or split the sequence with <code>limit_requests</code>.
+</div>
+
+<h2>A run that survives losing the runtime</h2>
+<p>With <code>output</code> set, the whole run state is written beside the JSON files after every
+  request: the hypernetwork, the per-task batch-norm statistics, which tasks have been seen and
+  forgotten, the accuracies, the timings, and the random number generator's state. Start the same
+  run again and it picks up from the last finished request.</p>
+
+<p>There is nothing to pass. It is on whenever <code>output</code> is:</p>
+
+<figure class="code"><pre><code>result = run_experiment(sequence=1, backbone="resnet50", epochs=5,
+                        root=DATA, output=SAVE)
+
+# Runtime dies at request 22. Run the same cell again:
+result = run_experiment(sequence=1, backbone="resnet50", epochs=5,
+                        root=DATA, output=SAVE)
+# resuming after 22 completed requests, from checkpoint_seq1_resnet50_seed0.pt</code></pre></figure>
+
+<p>The generator state is saved too, so a resumed run makes the same draws an uninterrupted one
+  would have made. That is tested rather than hoped for: a run killed after two requests and
+  resumed produces a history identical to one that was never stopped, even with the seed
+  deliberately changed in between.</p>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Argument</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>checkpoint=False</td><td>Do not write one. The run is then only as recoverable as its history file.</td></tr>
+    <tr><td>resume=False</td><td>Start from request 0 even though a checkpoint is there. It is overwritten as the new run goes.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+  <strong>Two things to know.</strong> The checkpoint is one file, overwritten in place, and it is
+  about as large as the hypernetwork: roughly 220 MB for ResNet50 at 200 chunks. Writing that to
+  Drive after every request is 30 writes over a long sequence, so if Drive is slow, keep
+  <code>output</code> on local disk during the run and copy the JSON files over at the end.
+  <br><br>
+  Resuming refuses a checkpoint whose config differs anywhere at all, because continuing one run
+  inside another would produce numbers belonging to neither. This matters most for a sweep: only
+  the sequence, backbone and seed are in the file name, so changing beta or gamma writes to the
+  same name, and a looser check would have resumed one sweep point inside the next. Give each
+  point its own directory, or pass <code>output=None</code> and keep the returned numbers.
 </div>
 
 <h2>Example 3: sweeping a parameter</h2>
@@ -629,7 +673,7 @@ results = run_sequences(
   about whether anything is happening. The inner bar counts optimizer steps and shows the current
   epoch and loss; the outer one counts requests and shows what each one cost as it lands.</p>
 
-<figure class="code"><pre><code>learn 3:  46%|####6     | 179/390 [01:24&lt;01:39, 2.12step/s, epoch 3/5, loss 1.284]
+<figure class="code"><pre class="sample"><code>learn 3:  46%|####6     | 179/390 [01:24&lt;01:39, 2.12step/s, epoch 3/5, loss 1.284]
 sequence 1:  10%|#         | 3/30 [06:51&lt;61:44, 137.2s/step, 181s, 4.2 GiB]</code></pre></figure>
 
 <p>They need no arguments, and turn themselves off when tqdm is not installed. Pass
@@ -640,7 +684,7 @@ sequence 1:  10%|#         | 3/30 [06:51&lt;61:44, 137.2s/step, 181s, 4.2 GiB]</
   forgetting are very different jobs, so they are reported separately rather than averaged into one
   meaningless number. A finished run prints this:</p>
 
-<figure class="code"><pre><code>  #  action task prot  steps   seconds  s/step  peak GiB
+<figure class="code"><pre class="sample"><code>  #  action task prot  steps   seconds  s/step  peak GiB
 --------------------------------------------------------
   0  learn     3    0    390     181.4   0.465      4.21
   1  learn     0    1    390     214.7   0.551      5.83
@@ -698,6 +742,8 @@ result["environment"]["hypernetwork_parameters"]</code></pre></figure>
     <tr><td>output</td><td>Directory for the two JSON files, or <code>None</code> to keep everything in memory.</td></tr>
     <tr><td>on_request</td><td>Called with each record as it finishes.</td></tr>
     <tr><td>verbose</td><td>Whether to print the per-request lines.</td></tr>
+    <tr><td>checkpoint</td><td>Save the run state after every request, so it can resume. Needs <code>output</code>.</td></tr>
+    <tr><td>resume</td><td>Continue from an existing checkpoint rather than starting over.</td></tr>
     <tr><td>config</td><td>A prepared <code>Config</code>, instead of the overrides.</td></tr>
     <tr><td>anything else</td><td>Goes to <code>Config</code>: <code>backbone</code>, <code>epochs</code>, <code>chunks</code>, <code>batch_size</code>, <code>beta</code>, <code>gamma</code>, <code>burn_in</code>, <code>noise_samples</code>, <code>seed</code>, <code>device</code>.</td></tr>
   </tbody>
@@ -1167,7 +1213,7 @@ print(f"peak {peak / 2 ** 30:.2f} GiB" if peak else "peak memory: no GPU")</code
 
 <p>To check the guide itself still runs:</p>
 
-<figure class="code"><pre><code>python scripts/check_guide.py</code></pre></figure>
+<figure class="code"><pre class="sample"><code>python scripts/check_guide.py</code></pre></figure>
 
 <p>It executes every code block on this page with the settings clamped small, on a CPU, in a few
   minutes. It verifies that the code runs, not that the numbers mean anything.</p>

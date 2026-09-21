@@ -68,6 +68,7 @@ def show(value) -> str:
 def run_experiment(sequence=1, limit_requests=None, max_images=None,
                    root=DEFAULT_ROOT, download=False, output=None,
                    on_request=None, verbose=True, progress=True,
+                   checkpoint=True, resume=True,
                    config=None, **overrides) -> dict:
     """Work through a request sequence. Returns history, metrics and costs.
 
@@ -89,6 +90,14 @@ def run_experiment(sequence=1, limit_requests=None, max_images=None,
     override arguments; `sequence` then only labels the output files.
     `download` fetches the dataset when it is missing, which a fresh Colab
     runtime needs.
+
+    `checkpoint` writes the whole run state beside those files after every
+    request, and `resume` picks it up if the run is started again. Together
+    they mean a killed run continues from its last finished request rather
+    than from the beginning. Both need `output`. The checkpoint is one file,
+    overwritten in place, and it is as large as the hypernetwork: about 220 MB
+    for ResNet50 at 200 chunks. Pass `checkpoint=False` to skip it, and
+    `resume=False` to start over while keeping one.
     """
     if config is None:
         config = make_config(sequence, limit_requests, **overrides)
@@ -112,6 +121,7 @@ def run_experiment(sequence=1, limit_requests=None, max_images=None,
             "summary": output / f"summary_{stem}.json",
             "costs": output / f"costs_{stem}.json",
             "environment": output / f"environment_{stem}.json",
+            "checkpoint": output / f"checkpoint_{stem}.pt",
         }
 
     log = RunLog(device=config.torch_device)
@@ -120,6 +130,20 @@ def run_experiment(sequence=1, limit_requests=None, max_images=None,
     def record_environment(built):
         log.setup_seconds = time.perf_counter() - setup_began
         log.start()
+
+        # A resumed run inherits the timings already recorded, so the totals
+        # cover the whole run rather than only the part after the restart.
+        if built.get("resumed_after"):
+            # Without this the returned history, and the file written from it,
+            # would hold only the requests since the restart.
+            history.extend(built["history"])
+            log.rows = built["costs"]
+            log.setup_seconds += built["setup_seconds"]
+            bar.update(built["resumed_after"])
+            if verbose:
+                print(f"resuming after {built['resumed_after']} completed "
+                      f"requests, from {paths['checkpoint'].name}")
+
         facts.update(environment(config, built["hypernet"], built["tasks"]))
         if verbose:
             print(f"sequence {sequence}: {len(config.requests)} requests over "
@@ -163,9 +187,16 @@ def run_experiment(sequence=1, limit_requests=None, max_images=None,
         if on_request is not None:
             on_request(record)
 
+    def collect_state(extra):
+        """The telemetry the checkpoint should carry alongside the model."""
+        extra["costs"] = log.rows
+        extra["setup_seconds"] = log.setup_seconds
+
     try:
         run_requests(config, on_request=record_done, tasks=tasks,
-                     on_start=record_environment, progress=progress)
+                     on_start=record_environment, progress=progress,
+                     checkpoint_path=paths.get("checkpoint") if checkpoint else None,
+                     resume=resume, on_checkpoint=collect_state)
     finally:
         bar.close()
 
