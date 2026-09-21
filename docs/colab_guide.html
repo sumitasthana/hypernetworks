@@ -288,12 +288,13 @@
 
 <header class="top">
   <div class="wrap">
-    <p class="eyebrow">uncle</p>
+    <p class="eyebrow">hypernetworks</p>
     <h1>Running UnCLe on Colab</h1>
     <p class="lede">How to run it, then what the paper actually measured and how to reproduce each
-      piece. The tasks come from this folder; the hypernetwork, the <span class="is-learn">learn</span>
-      and <span class="is-forget">forget</span> operations and the four metrics come from the
-      <code>uncle</code> package next door.</p>
+      piece, with what every run costs in time and GPU memory. One package,
+      <code>uncle</code>: the task streams, the hypernetwork, the
+      <span class="is-learn">learn</span> and <span class="is-forget">forget</span> operations, and
+      the four numbers the paper reports.</p>
     <div class="tabs" role="tablist">
       <button type="button" role="tab" id="tab-run" aria-controls="panel-run" aria-selected="true">Running it on Colab</button>
       <button type="button" role="tab" id="tab-paper" aria-controls="panel-paper" aria-selected="false">The paper's experiments</button>
@@ -310,7 +311,7 @@
   otherwise everything below runs on a CPU and the ResNet runs are hopeless.</p>
 
 <div class="cell">
-  <div class="cell-head"><span class="cell-num">1</span><span>Clone and put the folder on the path</span></div>
+  <div class="cell-head"><span class="cell-num">1</span><span>Clone and put the repository root on the path</span></div>
   <figure class="code"><pre><code>!git clone -q https://github.com/sumitasthana/hypernetworks /content/hypernetworks
 
 import sys
@@ -319,23 +320,29 @@ sys.path.insert(0, "/content/hypernetworks")</code></pre></figure>
 
 <div class="note">
   <strong>Do not</strong> <code>pip install -r requirements.txt</code> here. Colab already ships torch,
-  torchvision, numpy, Pillow and matplotlib, and reinstalling torch is the fastest way to get a build
-  that cannot see the GPU. That file is for a local machine.
+  torchvision, numpy, Pillow, matplotlib and tqdm, and reinstalling torch is the fastest way to get
+  a build that cannot see the GPU. That file is for a local machine. tqdm is the only optional one:
+  without it the progress bars quietly turn off and everything else works.
 </div>
 
 <div class="note warn">
-  <strong>Two ways the import goes wrong.</strong> The callable lives in
-  <code>uncle/experiments.py</code>, so it is <code>from uncle.experiments import run_experiment</code>.
-  <code>uncle.experiment</code> is the package next door: it holds <code>run</code>, which takes a
-  finished <code>Config</code>, and importing <code>run_experiment</code> from it fails. And the path
-  you add is the <code>hypernetworks</code> repository root, not the repository root; <code>run.py</code>
-  adds the root itself when it is imported, which is how <code>uncle</code> resolves.
+  <strong>Put the repository root on the path, not a folder inside it.</strong>
+  <code>/content/hypernetworks</code>, so that <code>import uncle</code> finds the package. An
+  earlier version of this project needed a subfolder on the path instead; that is no longer true and
+  no longer works.
   <br><br>
-  If <code>uncle</code> is missing from the clone, the clone predates it:
-  <code>!git -C /content/hypernetworks pull</code>, then <strong>Runtime &rarr; Restart session</strong>.
-  A pull on its own is not enough once a cell has imported anything, because Python keeps the old
-  modules in memory, and the stale <code>uncle.experiment.run</code> has no <code>tasks</code>
-  argument. That surfaces later as a confusing <code>TypeError</code>, not as an import error.
+  Two names that look alike and are not.
+  <code>uncle.experiments</code> (plural) is the front door, and holds
+  <code>run_experiment</code>, <code>run_sequences</code> and <code>make_config</code>.
+  <code>uncle.experiment</code> (singular) is the request loop underneath, and holds
+  <code>run</code>, which takes a finished <code>Config</code>. Importing
+  <code>run_experiment</code> from the singular one fails.
+  <br><br>
+  <strong>If anything looks stale, pull and restart.</strong>
+  <code>!git -C /content/hypernetworks pull</code>, then
+  <strong>Runtime &rarr; Restart session</strong>. A pull on its own is not enough once a cell has
+  imported anything, because Python keeps the old modules in memory. That surfaces later as a
+  confusing <code>TypeError</code> or an unexpected signature, not as an import error.
 </div>
 
 <div class="cell">
@@ -663,9 +670,11 @@ pd.DataFrame([{ "i": r["index"], "action": r["action"], "task": r["task"],
     look.</li>
   <li><strong>Accuracy here is validation accuracy.</strong> Tiny ImageNet's public test split has no
     labels, so the <code>test</code> slot holds <code>val</code>. Say so when you report a number.</li>
-  <li><strong>Task IDs differ between the two folders.</strong> This one shuffles the 200 WordNet IDs
-    with seed 42; <code>uncle/data.py</code> cuts them in sorted blocks. Task 3 is ten different
-    classes in each, so name the partition whenever you compare.</li>
+  <li><strong>Task IDs used to mean two different things.</strong> There were two Tiny ImageNet
+    loaders with different class groupings, so task 3 named different classes depending on which one
+    you went through. There is one now, on the seed-42 partition saved in
+    <code>uncle/task_partition.json</code> and checked on every run. Numbers from before that merge
+    are not comparable with numbers from after it.</li>
   <li><strong>A learn is not repeatable.</strong> The sequences never learn the same task twice and
     <code>Config</code> rejects it if you try. Relearning a forgotten task needs a separate adaptation
     path, which does not exist yet.</li>
@@ -746,8 +755,8 @@ pd.DataFrame([{ "i": r["index"], "action": r["action"], "task": r["task"],
   <div>
     <dt><span class="chip chip-part">small addition</span></dt>
     <dd>The experiment runs, but something it measures is not recorded, so you add a few lines in the
-      notebook. Both cases are timing: each forget request stores its burn-in but not its seconds.
-      Nothing inside the library changes.</dd>
+      notebook. Nothing here needs this any more: the two that did were both about timing, and
+      <code>uncle/telemetry.py</code> now records that.</dd>
   </div>
   <div>
     <dt><span class="chip chip-no">not implemented</span></dt>
@@ -872,7 +881,7 @@ print(max(ok or rows, key=lambda r: r[2]))</code></pre></figure>
 </div>
 
 <div class="exp">
-<h3>5. Burn-in annealing <span class="chip chip-part">small addition</span></h3>
+<h3>5. Burn-in annealing <span class="chip chip-yes">runs today</span></h3>
 <p><span class="lead">What happens</span> Burn-in is how many optimizer steps one unlearn request
   gets. The paper starts at 100 and cuts it 10% after every unlearn, with a floor of 20, then checks
   that forgetting is just as complete and measures the time saved (Table 7). On Tiny ImageNet, average
@@ -880,25 +889,22 @@ print(max(ok or rows, key=lambda r: r[2]))</code></pre></figure>
 <p><span class="lead">Why</span> It is a free efficiency win, and it tells you something about the
   method: later unlearns need fewer steps than earlier ones. The hypernetwork is getting better at
   forgetting as it goes, which is a real finding hiding inside an efficiency tweak.</p>
-<figure class="code"><pre><code>import time
-
-def timed():
-    marks = []
-    def on_request(record):
-        marks.append((record["action"], record["burn_in"], time.perf_counter()))
-    return marks, on_request
-
-for decay in (1.0, 0.9):                    # 1.0 turns annealing off
-    marks, hook = timed()
-    start = time.perf_counter()
+<figure class="code"><pre><code>for decay in (1.0, 0.9):                    # 1.0 turns annealing off
     out = run_experiment(sequence=1, backbone="resnet50", epochs=5,
                          burn_in_decay=decay, root=DATA,
-                         output=None, verbose=False, on_request=hook)
-    print(decay, out["numbers"]["forget_accuracy"], out["totals"]["forget"])</code></pre></figure>
-<p><span class="lead">Watch for</span> The <code>burn_in</code> field in each forget record: 100, 90,
-  81, 72 and so on down to 20. And check FA really does stay at 10 as the budget shrinks, because that
-  is the claim. The small addition is the timing: the code records burn-in but not seconds, so wrap
-  it as above, or time each request from the gaps between the marks.</p>
+                         output=None, verbose=False)
+    forget = out["totals"]["forget"]
+    print(f"decay={decay}  FA={out['numbers']['forget_accuracy']:.2f}  "
+          f"mean unlearn {forget['mean_seconds']:.1f}s over {forget['requests']} requests")
+
+# The burn-in the paper anneals, request by request.
+print([(row["index"], row["steps"], round(row["seconds"], 1))
+       for row in out["costs"] if row["action"] == "forget"])</code></pre></figure>
+<p><span class="lead">Watch for</span> The <code>steps</code> column for forget requests, which is the
+  annealed burn-in: 100, 90, 81, 72 and so on down to the floor of 20. Check the seconds fall with it,
+  and check FA really does stay at 10 as the budget shrinks, because that is the claim. Watch the
+  <code>s/step</code> column too: if it climbs while <code>steps</code> falls, the regularizer is
+  eating the saving, because it grows with the number of protected tasks.</p>
 </div>
 
 <div class="exp">
@@ -989,26 +995,23 @@ print("on tasks", kept)</code></pre></figure>
 </div>
 
 <div class="exp">
-<h3>9. Unlearning time <span class="chip chip-part">small addition</span></h3>
+<h3>9. Unlearning time <span class="chip chip-yes">runs today</span></h3>
 <p><span class="lead">What happens</span> Seconds per unlearn request, averaged over the sequence
   (Table 10). UnCLe takes 29.63 seconds on Tiny ImageNet against 147.5 for GKT and 65.20 for SalUn.</p>
 <p><span class="lead">Why</span> Unlearning that needs data or retraining is slow and awkward in a
   continual setting. This is the practical argument for a data-free method, and it is entirely
   controlled by burn-in.</p>
-<figure class="code"><pre><code>import time
-stamps = []
-def clock(record):
-    stamps.append((record["action"], time.perf_counter()))
+<figure class="code"><pre><code>out = run_experiment(sequence=1, backbone="resnet50", epochs=5,
+                     root=DATA, output=SAVE, verbose=False)
 
-run_experiment(sequence=1, backbone="resnet50", epochs=5,
-               root=DATA, output=SAVE, on_request=clock, verbose=False)
-
-gaps = [(a, t - stamps[i - 1][1]) for i, (a, t) in enumerate(stamps) if i]
-forgets = [g for a, g in gaps if a == "forget"]
-print("mean unlearning time", sum(forgets) / len(forgets))</code></pre></figure>
-<p><span class="lead">Watch for</span> The comparison is only fair on the same GPU. The paper's numbers
-  are from a V100; a T4 is slower, so reproduce the <em>shape</em> (unlearning much cheaper than
-  learning, and getting cheaper as annealing kicks in) rather than the absolute seconds.</p>
+print(out["totals"]["forget"])   # requests, total, mean and slowest seconds
+print(out["totals"]["learn"])    # the same for learning, to compare against
+print(out["totals"]["peak_memory_bytes"] / 2 ** 30, "GiB peak")</code></pre></figure>
+<p><span class="lead">Watch for</span> The comparison is only fair on the same GPU. The paper's
+  numbers are from a V100; a T4 is slower, so reproduce the <em>shape</em>, unlearning much cheaper
+  than learning and getting cheaper as annealing kicks in, rather than the absolute seconds. The
+  saved <code>costs_</code> file holds every request, and the <code>environment_</code> file records
+  which GPU produced them, which is what makes two runs comparable at all.</p>
 </div>
 
 <div class="exp">
