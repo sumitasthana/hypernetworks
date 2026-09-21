@@ -312,7 +312,7 @@
 
 <div class="cell">
   <div class="cell-head"><span class="cell-num">1</span><span>Clone and install, once per runtime</span></div>
-  <figure class="code"><pre><code>import os, subprocess, sys
+  <figure class="code"><pre><code>import importlib, os, subprocess, sys
 
 REPO = "/content/hypernetworks"
 URL = "https://github.com/sumitasthana/hypernetworks"
@@ -324,7 +324,11 @@ else:
 
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", REPO, "--no-deps"],
                check=True)
+
 os.chdir(REPO)
+if REPO not in sys.path:
+    sys.path.insert(0, REPO)
+importlib.invalidate_caches()   # see the note below: this line is load-bearing
 
 import uncle
 print("uncle imported from", uncle.__file__)</code></pre></figure>
@@ -354,6 +358,16 @@ print("uncle imported from", uncle.__file__)</code></pre></figure>
   <br><br>
   <code>--no-deps</code> stops pip reaching for torch, which Colab already has and which you do not
   want reinstalled.
+  <br><br>
+  <strong>Why <code>importlib.invalidate_caches()</code> is in there.</strong> Without it the cell
+  can clone the repository, install it, change directory into it, and still fail on
+  <code>import uncle</code> with the files plainly visible in the file browser. When a path is added
+  to <code>sys.path</code> before the directory exists, Python caches the fact that nothing
+  importable lives there, and goes on trusting that cache after the directory appears. The same
+  applies to the <code>.pth</code> file an editable install drops into site-packages, which is read
+  when the interpreter starts. One call clears both. Restarting the runtime also clears it, but then
+  you have to remember to re-run this cell first, which is the loop that caused the trouble in the
+  first place.
   <br><br>
   Two names that look alike and are not.
   <code>uncle.experiments</code> (plural) is the front door, and holds
