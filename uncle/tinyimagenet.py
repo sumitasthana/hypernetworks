@@ -11,19 +11,44 @@ DEFAULT_ROOT = Path(__file__).resolve().parents[1] / "data" / "tiny-imagenet-200
 URL = "https://cs231n.stanford.edu/tiny-imagenet-200.zip"
 
 
+#: What an extracted Tiny ImageNet has to contain to be usable.
+MARKERS = ("wnids.txt", "words.txt", "train", "val/val_annotations.txt")
+
+
+def missing_parts(root) -> list[str]:
+    """Which of the markers are absent. Empty means the dataset is usable."""
+    root = Path(root)
+    return [name for name in MARKERS if not (root / name).exists()]
+
+
 def prepare_data(root=DEFAULT_ROOT, download=False):
-    """Return the extracted dataset directory; download only when requested."""
+    """Return the extracted dataset directory, fetching it when asked to.
+
+    The test is whether the dataset is complete, not whether the directory is
+    there. A half-finished download leaves the directory behind, and checking
+    only for its existence then skips the repair and reports the dataset as
+    missing while telling you to pass the flag you already passed. Extraction
+    into a network drive is where this usually happens: 120,000 small files is
+    a lot to ask of one.
+    """
     root = Path(root).expanduser().resolve()
-    if not root.exists() and download:
+    missing = missing_parts(root)
+
+    if missing and download:
         if root.name != "tiny-imagenet-200":
             raise ValueError("For download, root must end in tiny-imagenet-200")
         download_and_extract_archive(URL, str(root.parent))
-    for name in ("wnids.txt", "words.txt", "train", "val/val_annotations.txt"):
-        if not (root / name).exists():
-            raise FileNotFoundError(
-                f"Missing {root / name}. Supply the extracted dataset root, "
-                "or use download=True for a new dataset."
-            )
+        missing = missing_parts(root)
+
+    if missing:
+        raise FileNotFoundError(
+            f"{root} is missing {', '.join(missing)}. "
+            + ("The download ran and still did not produce them, so the "
+               "extraction was interrupted: delete that directory and retry, "
+               "and prefer local disk over a mounted drive."
+               if download else
+               "Supply the extracted dataset root, or pass download=True.")
+        )
     return root
 
 

@@ -393,18 +393,34 @@ print(torch.cuda.is_available(), torch.cuda.get_device_name(0))</code></pre></fi
   pass. If this prints <code>False</code>, stop and fix the runtime type.</p>
 
 <div class="cell">
-  <div class="cell-head"><span class="cell-num">3</span><span>Mount Drive, so the 240 MB download happens once</span></div>
+  <div class="cell-head"><span class="cell-num">3</span><span>Dataset on local disk, results on Drive</span></div>
   <figure class="code"><pre><code>from google.colab import drive
 drive.mount("/content/drive")
 
-# Must end in tiny-imagenet-200: that is what download=True checks before fetching.
-DATA = "/content/drive/MyDrive/uncle/data/tiny-imagenet-200"
+# The dataset goes on local disk. Must end in tiny-imagenet-200: that is what
+# download=True checks before fetching.
+DATA = "/content/data/tiny-imagenet-200"
+
+# The results go on Drive, where they survive the runtime.
 SAVE = "/content/drive/MyDrive/uncle/results"</code></pre></figure>
 </div>
 
-<p>Pass <code>root=DATA, download=True</code> the first time. The archive extracts into Drive and
-  every later runtime finds it already there. Leave <code>root</code> out entirely and the data lands
-  inside the cloned repo, which disappears with the runtime.</p>
+<p>Pass <code>root=DATA, download=True</code> on the first call of a session. The dataset is 240 MB
+  and re-downloads each time the runtime is recycled, which takes about a minute.</p>
+
+<div class="note warn">
+  <strong>Do not put the dataset on Drive.</strong> It is tempting, because then the download happens
+  once instead of once per session. But Tiny ImageNet is 120,000 small files, and extracting that
+  through Drive's mount is slow and stalls often. A stall leaves the directory in place but
+  incomplete, which used to produce a particularly unhelpful failure: the code checked only whether
+  the directory existed, so it skipped the repair and then reported the dataset as missing while
+  telling you to pass <code>download=True</code>, which you already had. It now checks whether the
+  dataset is complete, and repairs a partial copy. Still, keep the dataset local and Drive for
+  results, which are a handful of small JSON files and exactly what a mounted drive is good at.
+  <br><br>
+  If you have a half-extracted copy on Drive from before, point <code>DATA</code> at local disk as
+  above and it will be ignored. Deleting it is optional.
+</div>
 
 <h2>Example 1: the smoke test</h2>
 <p>Run this before anything expensive. It uses the small stand-in network, 32 chunks, one epoch, the

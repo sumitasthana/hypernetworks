@@ -8,7 +8,10 @@ import unittest
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from unittest.mock import patch
+
 from uncle.tasks import ClassTask, load_partition
+from uncle.tinyimagenet import missing_parts, prepare_data
 
 
 class FakeDataset:
@@ -65,6 +68,37 @@ class TaskTests(unittest.TestCase):
             path.write_text(json.dumps(edited))
             with self.assertRaises(ValueError):
                 load_partition(root, path)
+
+
+class PrepareDataTests(unittest.TestCase):
+    """A directory that exists but is incomplete still needs downloading."""
+
+    def test_a_partial_extraction_is_repaired_not_reported_as_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "tiny-imagenet-200"
+            (root / "val").mkdir(parents=True)
+            (root / "wnids.txt").touch()          # a stalled extraction
+            self.assertTrue(missing_parts(root))
+
+            def finish(url, target):
+                (root / "words.txt").touch()
+                (root / "train").mkdir(exist_ok=True)
+                (root / "val" / "val_annotations.txt").touch()
+
+            with patch("uncle.tinyimagenet.download_and_extract_archive", finish):
+                self.assertEqual(prepare_data(root, download=True), root.resolve())
+
+    def test_a_download_that_fixes_nothing_says_so(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "tiny-imagenet-200"
+            root.mkdir()
+            with patch("uncle.tinyimagenet.download_and_extract_archive",
+                       lambda url, target: None):
+                with self.assertRaises(FileNotFoundError) as caught:
+                    prepare_data(root, download=True)
+            # Not "pass download=True", which is what the caller just did.
+            self.assertIn("extraction was interrupted", str(caught.exception))
+            self.assertNotIn("pass download=True", str(caught.exception))
 
 
 if __name__ == "__main__":
