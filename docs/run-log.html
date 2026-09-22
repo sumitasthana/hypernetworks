@@ -441,6 +441,125 @@ forget   s/step = 0.0063 + 0.0475 * protected</pre>
 <p>The seven baseline methods are excluded deliberately. Implementing them is weeks of work to
   re-establish a result the paper already reports and nobody disputes.</p>
 
+<h2>Angle B: budgeting the protected set</h2>
+<p>The regularizer protects every task seen so far, on every optimizer step, by regenerating each
+  one's weights and comparing them against a frozen reference. That is what the measured cost model
+  says a run spends its time on. Angle B asks what happens if it protects a subset instead, and
+  which subset.</p>
+
+<p>This is not a new idea in itself. Von Oswald et al. sample a random subset of past tasks for
+  exactly this reason and expose it as a batch size. What is unexamined is the continual
+  <em>unlearning</em> case, where the protected set holds two kinds of task with opposite purposes:
+  retained ones whose mapping should be preserved, and forgotten ones whose mapping should be held
+  at noise.</p>
+
+<h3>The rules to compare</h3>
+<p>Each is a different answer to "which tasks does this step protect". The cost of each follows from
+  the measured model, because the protected count is the only term that varies.</p>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Rule</th><th>Protects</th><th>Hours</th><th>vs full</th><th>Peak GiB</th><th>New code</th></tr></thead>
+  <tbody>
+    <tr><td>Full history</td><td>every task seen, the paper's rule</td>
+        <td class="n">0.93</td><td class="n">100%</td><td class="n">7.72</td><td class="n">none</td></tr>
+    <tr><td>Retain-only</td><td>seen tasks not yet forgotten</td>
+        <td class="n">0.54</td><td class="n">58%</td><td class="n">5.95</td><td class="n">one filter</td></tr>
+    <tr><td>Random-k, k=10</td><td>10 sampled without replacement</td>
+        <td class="n">0.80</td><td class="n">86%</td><td class="n">6.34</td><td class="n">sampler</td></tr>
+    <tr><td>Random-k, k=5</td><td>5 sampled</td>
+        <td class="n">0.55</td><td class="n">59%</td><td class="n">5.36</td><td class="n">sampler</td></tr>
+    <tr><td>Random-k, k=2</td><td>2 sampled</td>
+        <td class="n">0.35</td><td class="n">37%</td><td class="n">4.76</td><td class="n">sampler</td></tr>
+    <tr><td>Random-k, k=1</td><td>1 sampled</td>
+        <td class="n">0.27</td><td class="n">29%</td><td class="n">4.57</td><td class="n">sampler</td></tr>
+    <tr><td>Stratified k</td><td>k split between retained and forgotten</td>
+        <td class="n">= random-k</td><td class="n">&mdash;</td><td class="n">= random-k</td><td class="n">weighted sampler</td></tr>
+    <tr><td>Fixed bounded set</td><td>a chosen m, never resampled</td>
+        <td class="n">= random-k</td><td class="n">&mdash;</td><td class="n">= random-k</td><td class="n">selection policy</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Tiny ImageNet, sequence 1, one seed. Stratified and fixed-set cost the same as random-k at the
+  same budget, because cost depends on how many tasks are protected and not on which. That is
+  convenient: any difference between those three in the results is about the choice, not the
+  compute.</p>
+
+<div class="note">
+  <strong>Sampling bounds the work per step, not the memory of the run.</strong> Random-k still
+  needs every past task's embedding in order to sample from them, so it does not give bounded total
+  memory. A fixed bounded set is a different algorithm and the only one of these that does. Worth
+  keeping separate in the write-up, because they are easy to conflate and only one of them answers
+  the scalability question.
+</div>
+
+<h3>Where the saving actually lives</h3>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Setting</th><th>Requests</th><th>Max history</th><th>Full</th><th>k=5</th><th>Saving</th></tr></thead>
+  <tbody>
+    <tr><td>Permuted MNIST, sequence 1</td><td class="n">15</td><td class="n">9</td>
+        <td class="n">1.69 h</td><td class="n">1.44 h</td><td class="n">15%</td></tr>
+    <tr><td>Tiny ImageNet, sequence 1</td><td class="n">30</td><td class="n">17</td>
+        <td class="n">0.93 h</td><td class="n">0.55 h</td><td class="n">41%</td></tr>
+    <tr><td>Longest sequence 20 tasks allow</td><td class="n">40</td><td class="n">19</td>
+        <td class="n">1.25 h</td><td class="n">0.63 h</td><td class="n">50%</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>The saving grows with the length of the history, which is the whole claim. It also decides where
+  to run the pilot: on Permuted MNIST the history never exceeds nine tasks, so capping at five
+  saves 15% and the effect looks marginal. <strong>A Permuted MNIST pilot is the wrong place to
+  demonstrate this.</strong> It is a reasonable place to check that retention does not fall apart,
+  which is a different question and worth separating.</p>
+
+<p>Memory behaves the same way and may matter more than the hours. Full history climbs from 4.37 to
+  7.72 GiB across a sequence; k=5 stays flat at 5.36. Flat memory is what would make sequences
+  longer than 40 requests, or backbones larger than ResNet50, possible at all.</p>
+
+<h3>The grid</h3>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Block</th><th>Runs</th><th>A100 hours</th></tr></thead>
+  <tbody>
+    <tr><td>6 rules &times; 3 sequences &times; 3 seeds, Tiny ImageNet</td><td class="n">54</td><td class="n">31.5</td></tr>
+    <tr><td>k sweep over 1, 2, 5, 10, 20 &times; 3 seeds</td><td class="n">15</td><td class="n">8.7</td></tr>
+    <tr><td>Longest-sequence stress, 2 rules &times; 3 seeds</td><td class="n">6</td><td class="n">5.6</td></tr>
+    <tr><td>Permuted MNIST retention check, 2 rules &times; 3 seeds</td><td class="n">6</td><td class="n">9.4</td></tr>
+    <tr><td><strong>Total</strong></td><td class="n"><strong>81</strong></td><td class="n"><strong>55.3</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>H100 at twice the throughput, 27.6 hours. With TF32, plausibly 13.8. Both multipliers are
+  assumptions, not measurements.</p>
+
+<p>For comparison, the paper's own grid is 102 A100 hours. <strong>Angle B costs about half of
+  reproducing the paper, and it is the study that makes everything after it cheaper.</strong></p>
+
+<h3>What has to be built</h3>
+<p>Small. The protected list is already assembled in one place, in the request loop, and handed to
+  <code>preserve</code>. A selection rule is a function from that list and the forgotten set to a
+  subset, picked by a config field. The samplers are a few lines each; the fixed-set policy needs a
+  little more, because it has to decide what to keep.</p>
+
+<p>Two measurement requirements that are easy to forget. Selection overhead belongs in the reported
+  cost rather than excluded as bookkeeping, though for random sampling it will be negligible. And
+  for uniform sampling without replacement the subset mean is an unbiased estimate of the full
+  mean, so the objective is unchanged; stratified or non-uniform selection needs weights to keep
+  that true, or selection and a reweighted objective are confounded and neither can be read from
+  the result.</p>
+
+<div class="note bad">
+  <strong>All of this is contingent.</strong> Every hour costed here assumes a run that retains
+  something. The current implementation returns 10% retain accuracy, so a comparison of selection
+  rules would presently be a comparison of ways to fail. The gamma probe comes first.
+</div>
+
 <footer>
   Run of 21 September 2026 on commit c6d89ce. Every figure here is measured, from
   <code>costs_seq1_resnet50_seed0.json</code> and the run's console output, except the cost model
