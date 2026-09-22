@@ -302,6 +302,37 @@ def test_resnet_target_keeps_buffers_per_task():
     assert not torch.equal(before, uncle.task_buffers["A"]["bn1.running_mean"])
 
 
+def test_dataset_defaults_are_the_papers_stated_values():
+    """Every value the paper states for a dataset, checked in one place.
+
+    The backbone used to be missing here, so Tiny ImageNet silently inherited
+    the dataclass default of ResNet18 where the paper specifies ResNet50.
+    """
+    from uncle.config import dataset_defaults
+
+    expected = {
+        "permuted_mnist": {"beta": 0.1, "backbone": "resnet18",
+                           "tasks": 10, "requests": 15},
+        "tiny_imagenet": {"beta": 0.01, "backbone": "resnet50",
+                          "tasks": 20, "requests": 30},
+    }
+    for dataset, want in expected.items():
+        got = dataset_defaults(dataset, 1)
+        assert got["beta"] == want["beta"], (dataset, got["beta"])
+        assert got["backbone"] == want["backbone"], (dataset, got["backbone"])
+        assert len(got["tasks"]) == want["tasks"], (dataset, len(got["tasks"]))
+        assert len(got["requests"]) == want["requests"], dataset
+
+    # And the values the paper states once, for every dataset.
+    config = Config(**dataset_defaults("tiny_imagenet", 1))
+    assert config.hidden == (128, 256, 512)
+    assert config.code_dim == 32 and config.chunks == 200
+    assert config.classes_per_task == 10
+    assert config.learning_rate == 0.001
+    assert config.gamma == 0.01 and config.noise_samples == 10
+    assert (config.burn_in, config.burn_in_decay, config.burn_in_min) == (100, 0.9, 20)
+
+
 def test_tiny_imagenet_tasks_come_from_the_saved_partition():
     """One loader, one grouping. The partition itself is tested in test_tasks.py."""
     from uncle.data import build_tasks

@@ -29,18 +29,23 @@ TINY_IMAGENET_SEQUENCES = {
 }
 
 # Per-dataset defaults from the paper: the request sequences, how many tasks
-# the sequences address, and beta (Appendix C: 1e-1 for Permuted MNIST and
-# CIFAR-100, 1e-2 for Tiny-ImageNet, 1e-3 for 5-Tasks).
+# the sequences address, beta (Appendix C: 1e-1 for Permuted MNIST and
+# CIFAR-100, 1e-2 for Tiny-ImageNet, 1e-3 for 5-Tasks), and the backbone
+# ("ResNet18 in the case of Permuted MNIST experiments and ResNet50 elsewhere
+# to demonstrate scalability"). The backbone belongs here rather than in the
+# dataclass default: leaving it to the global default silently gave Tiny
+# ImageNet a ResNet18, which is not the paper's setting and says nothing when
+# it happens.
 
 
 DATASETS = {
     "permuted_mnist": {
         "channels": 1, "size": 28, "task_count": 10, "beta": 0.1,
-        "sequences": PERMUTED_MNIST_SEQUENCES,
+        "backbone": "resnet18", "sequences": PERMUTED_MNIST_SEQUENCES,
     },
     "tiny_imagenet": {
         "channels": 3, "size": 64, "task_count": 20, "beta": 0.01,
-        "sequences": TINY_IMAGENET_SEQUENCES,
+        "backbone": "resnet50", "sequences": TINY_IMAGENET_SEQUENCES,
     },
 }
 
@@ -54,10 +59,12 @@ def parse_sequence(text: str) -> tuple[tuple[str, str], ...]:
 
 
 def dataset_defaults(dataset: str, sequence: int) -> dict:
-    """The paper's task list, request sequence and beta for one dataset.
+    """The paper's task list, request sequence, beta and backbone for a dataset.
 
     Sequence numbers are the rows of Table 4. The task list is sized to the
     sequence: Permuted MNIST names tasks 0-9, Tiny-ImageNet names 0-19.
+    Everything here is a value the paper states, so a caller that overrides one
+    is departing from the paper on purpose.
     """
     settings = DATASETS[dataset]
     return {
@@ -65,6 +72,7 @@ def dataset_defaults(dataset: str, sequence: int) -> dict:
         "tasks": tuple(str(index) for index in range(settings["task_count"])),
         "requests": parse_sequence(settings["sequences"][sequence]),
         "beta": settings["beta"],
+        "backbone": settings["backbone"],
     }
 
 

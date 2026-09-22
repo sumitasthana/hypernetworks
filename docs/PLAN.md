@@ -6,7 +6,7 @@ Working document for whoever picks this up next, human or agent. Reproduce
 needs. Several of the paper's own experiments double as controls for that
 hypothesis; those are marked **dual purpose** and should not be run twice.
 
-Last updated 2026-09-21 at commit `ca398ea`.
+Last updated 2026-09-22.
 
 ---
 
@@ -60,7 +60,87 @@ general observation that relearning can reverse unlearning.
 
 ---
 
-## 2. Status
+## 2. What the paper pins down, and what it leaves to us
+
+### Stated, and honoured in `Config`
+
+Checked by `test_dataset_defaults_are_the_papers_stated_values`. Overriding one
+of these is a deliberate departure from the paper, not a tuning choice.
+
+| | Paper | In our config |
+| --- | --- | --- |
+| Hypernetwork hidden layers | 128, 256, 512 | `hidden` |
+| Task / chunk embedding dim | 32 / 32 | `code_dim` |
+| Chunks per generated network | 200 | `chunks` |
+| Classes per task | 10 | `classes_per_task` |
+| Tasks | 10, 5-Tasks 5, Tiny ImageNet 20 per Table 4 | `DATASETS[...]["task_count"]` |
+| Requests | 7 / 15 / 30 | Table 4, verbatim |
+| Optimizer, learning rate | Adam, 0.001 | `learning_rate` |
+| Beta | 0.1 PMNIST, 0.1 CIFAR-100, 0.01 Tiny ImageNet, 0.001 5-Tasks | `DATASETS[...]["beta"]` |
+| Gamma | 0.01, except 0.1 for 5-Tasks | `gamma` |
+| Burn-in | 100, decay 10% per unlearn, floor 20 | `burn_in`, `burn_in_decay`, `burn_in_min` |
+| Noise samples | 10 | `noise_samples` |
+| Backbone | ResNet18 for Permuted MNIST, ResNet50 elsewhere | `DATASETS[...]["backbone"]` |
+| Seeds | 3 runs, values not given | `seed`, we use 0, 1, 2 |
+| Initialization | Hyperfan | **not implemented**, see D2 |
+
+The backbone row was wrong until 2026-09-22. `dataset_defaults` did not return
+one, so Tiny ImageNet inherited the dataclass default of ResNet18 where the
+paper specifies ResNet50, and said nothing about it. Any run that did not pass
+`backbone=` explicitly was generating the wrong architecture. The measured
+run did pass it, so its numbers stand.
+
+Search grids the paper also states, useful when repeating its searches:
+beta over 1, 0.1, 0.01, 0.001; gamma over 0.1, 0.01, 0.001.
+
+### Unstated, so ours to choose
+
+The main text defers epochs, batch size, the learning rate schedule and the
+seeds to Appendix C. Appendix C covers sequences, beta, gamma and burn-in, and
+never returns to them.
+
+| | Ours | Range to try | |
+| --- | --- | --- | --- |
+| Epochs per learn | 5 | 3 to 20 | * |
+| Batch size | 64 | 32 to 256 | * |
+| Learning rate schedule | none | none, cosine, step | * |
+| Preserve reduction | mean over tasks | mean, sum | * |
+| Noise target | raw, before scaling | raw, scaled | * |
+| BatchNorm buffers on forget | preserved | preserve, reset | dual purpose, T2.1 |
+| Classifier output scale | 1/fan_in | 1/fan_in, sqrt(2/fan_in), Hyperfan | D2 |
+| Class partition | shuffle at seed 42 | fixed | D3 |
+| Chunk split across heads | one each, then proportional | fixed | |
+| Evaluation batch size | 256 | no effect on results | |
+
+`*` marks a candidate cause of the collapse, or an assumption large enough to
+move retain accuracy by several points.
+
+Five of these can move the headline number, and three of them are already T0.2.
+That ordering is deliberate: gamma is stated and we are using the paper's
+value, so if the gamma probe comes back clean, the fault is in one of the rows
+above rather than in a knob we tuned badly.
+
+Sweep order after Phase 0: epochs and batch size together, since they trade
+off against each other, then the schedule. Leave the rest alone unless the
+numbers still miss.
+
+### Not reproducible at all
+
+| | Why |
+| --- | --- |
+| `UNI` (Table 8) | Reported with values including negative infinity, and never defined anywhere in the paper |
+| Their variance | Seed values not given |
+| Their exact class groups | Grouping and ordering never stated, for Tiny ImageNet or CIFAR-100 |
+
+Drop `UNI` from any reproduction target. A number whose formula does not exist
+cannot be matched, and listing it as outstanding work wastes someone's day.
+
+There is also no code release. Nothing in the paper points to a repository, so
+every ambiguity above had to be decided rather than looked up.
+
+---
+
+## 3. Status
 
 ### Works, verified
 
@@ -72,7 +152,7 @@ general observation that relearning can reverse unlearning.
   count, written to disk as the run goes.
 - Checkpoint after every request. A killed run resumes and reproduces the
   history it would have had, exactly, verified on CPU.
-- 40 checks across `tests/`, plus 18 executable blocks in the Colab guide via
+- 41 checks across `tests/`, plus 19 executable blocks in the Colab guide via
   `scripts/check_guide.py`.
 
 ### Broken, blocking everything
@@ -106,7 +186,7 @@ Full record in the run log, which is kept outside the repository.
 
 ---
 
-## 3. Decisions already made
+## 4. Decisions already made
 
 Do not re-litigate these without a reason. Each was decided deliberately.
 
@@ -128,7 +208,7 @@ Do not re-litigate these without a reason. Each was decided deliberately.
 
 ---
 
-## 4. Traps already paid for
+## 5. Traps already paid for
 
 Do not reintroduce these. Each cost real time.
 
@@ -149,7 +229,7 @@ Do not reintroduce these. Each cost real time.
 
 ---
 
-## 5. Plan
+## 6. Plan
 
 Cost figures are A100-hours. They come from a model fitted to the thirty
 measured requests of that run, which reproduces its total to within 0.1%:
@@ -318,7 +398,7 @@ Only if a claim needs them. Each is code plus compute.
 
 ---
 
-## 6. Budget
+## 7. Budget
 
 | Block | A100 h | On H100 at 2x |
 | --- | --- | --- |
@@ -336,7 +416,7 @@ in this plan.**
 
 ---
 
-## 7. How to verify anything
+## 8. How to verify anything
 
 ```bash
 python tests/test_uncle.py          # 14 checks, seconds
@@ -356,7 +436,7 @@ input. The only question is what pushed it there.
 
 ---
 
-## 8. Open questions for the team
+## 9. Open questions for the team
 
 - **Q1.** Do we need the seven baselines, or do we cite the paper? See D1.
   Affects the budget by roughly a factor of four and weeks of engineering.
