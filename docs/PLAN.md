@@ -12,8 +12,8 @@ Last updated 2026-09-21 at commit `ca398ea`.
 
 ## 1. Our hypothesis
 
-**Working title: Component-level attribution of residual knowledge after task
-unlearning.**
+**Working title: Component-level Attribution of Residual Knowledge after Task
+Unlearning.**
 
 > Does UnCLe remove a forgotten task's information, or only remove access to
 > it? And if it is recoverable, which components of the model hold it?
