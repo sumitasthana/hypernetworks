@@ -146,9 +146,12 @@ measured run and accurate to 0.1% on it. Halve for H100.
 
 ### Phase 0. Unblock. Nothing downstream is meaningful until this passes.
 
-**T0.1 Gamma probe.** *0.2 h.*
+**T0.1 Gamma probe.** *0.2 h.* Written, not yet run: `scripts/gamma_probe.py`.
 Three requests (`L3 L0 U3`), gamma in `(0.1, 0.01, 0.001, 0.0001)`, ResNet50,
-sequence 1, `output=None`.
+sequence 1, `output=None`. Run `--check` first: it validates the setup and
+trains nothing. The script applies the accept rule below and prints its own
+verdict, either TUNING with the winning gamma or STRUCTURAL with the next
+places to look.
 - Record for each: task 0's accuracy before and after the forget, and
   `mean_spill`.
 - **Accept:** a gamma exists where task 3 lands at or below 12% and task 0

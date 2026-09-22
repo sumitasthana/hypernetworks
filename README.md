@@ -1,12 +1,37 @@
-# UnCLe on Permuted MNIST and Tiny ImageNet
+# UnCLe, reproduced
 
-A reimplementation of [An Unlearning Framework for Continual
-Learning](https://arxiv.org/abs/2509.17530) (Adhikari, Kumaravelu, Srijith).
+An independent reproduction of **UnCLe**, the method introduced in *An
+Unlearning Framework for Continual Learning* (Adhikari, Kumaravelu and Srijith,
+2025, [arXiv:2509.17530](https://arxiv.org/abs/2509.17530)), together with a
+study of what its unlearning step leaves behind.
 
-One hypernetwork produces the weights of a small CNN from a short code, one
-code per task. Learning a task trains the hypernetwork to classify it.
-Forgetting a task trains the hypernetwork to turn that task's code into noise,
+A note on names, since the two get conflated. *An Unlearning Framework for
+Continual Learning* is the paper. **UnCLe** is the method it introduces, and
+what this repository implements. There is no paper called UnCLe.
+
+One hypernetwork produces the weights of a target network from a short code,
+one code per task. Learning a task trains the hypernetwork to classify it.
+Forgetting a task trains the hypernetwork to turn that task code into noise,
 which needs no data at all.
+
+## Where things stand
+
+The implementation runs the paper's full setting end to end and **does not yet
+reproduce its numbers**. One pass of sequence 1 on Tiny ImageNet returns 10%
+retain accuracy against the paper's 55.24%: learning works, forgetting works,
+and forgetting destroys the tasks it is supposed to preserve. That is a fault
+in this code, not a finding about the method, and nothing else is worth
+measuring until it is fixed.
+
+| Read this | For |
+| --- | --- |
+| [docs/PLAN.md](docs/PLAN.md) | What is done, what is next, what it costs, and what not to re-litigate |
+| `ops-docs/run-log.html` | The full record of the first end-to-end run, and a cost model fitted to it |
+| `ops-docs/colab_guide.html` | Running this on a Colab GPU, and every experiment in the paper |
+| `ops-docs/building-it-up.md` | How the data and task code were built, stage by stage |
+
+The `ops-docs/` write-ups are kept local and are not committed. Only the plan
+travels with the code.
 
 ## Run it
 
@@ -24,8 +49,17 @@ For a quick check without a GPU, swap in the small stand-in network:
 ```bash
 python main.py --backbone cnn --chunks 32 --epochs 1
 python tests/test_uncle.py         # fourteen checks, seconds, no download
-python tests/test_tasks.py         # three checks on the class partition
-python tests/test_experiments.py   # twelve checks, a couple of minutes, needs the images
+python tests/test_tasks.py         # eight checks on the partition and the guide
+python tests/test_experiments.py   # eighteen checks, a couple of minutes, needs the images
+python scripts/check_guide.py      # runs every code block in the Colab guide
+```
+
+When a run collapses to 10% on every task, start here. It varies gamma over the
+first three requests and reports whether the damage is tuning or structural:
+
+```bash
+python scripts/gamma_probe.py --check   # validate the setup, train nothing
+python scripts/gamma_probe.py           # about ten minutes on an A100
 ```
 
 Tiny ImageNet downloads itself on first use (about 240 MB) and wants a GPU. It
