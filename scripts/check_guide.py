@@ -7,15 +7,18 @@ existed after a particular run. They all reproduce in plain Python in seconds.
 
     python scripts/check_guide.py
 
-Needs the local ops-docs/colab_guide.html and the dataset in data/tiny-imagenet-200.
+The guide is not committed. Point at it with --guide or UNCLE_GUIDE if it is
+not where this expects. Also needs the dataset in data/tiny-imagenet-200.
 Runs on a CPU in a few minutes,
 because every call is clamped to the small backbone, a few requests and a
 hundred images per task. It checks that the code runs, not that the numbers
 mean anything.
 """
 
+import argparse
 import html
 import json
+import os
 import re
 import sys
 import traceback
@@ -31,21 +34,29 @@ import uncle.baseline as baseline
 import uncle.experiments as experiments
 
 ROOT = Path(__file__).resolve().parents[1]
-GUIDE = ROOT / "ops-docs" / "colab_guide.html"
+
+#: Where the guide usually sits. It is not committed, so this is a default and
+#: not a dependency: override it with --guide, or with UNCLE_GUIDE. Everything
+#: here skips cleanly when there is no guide to check.
+DEFAULT_GUIDE = Path(os.environ.get("UNCLE_GUIDE",
+                                    ROOT / "ops-docs" / "colab_guide.html"))
 
 
 BLOCK = re.compile(r'<pre(?P<attrs>[^>]*)><code>(?P<code>.*?)</code></pre>', re.S)
 
 
-def guide_blocks(runnable_only=False):
-    """Every code block in the guide, in order.
+def guide_blocks(runnable_only=False, guide=None):
+    """Every code block in the guide, in order. Empty when there is no guide.
 
     A block the page marks `class="sample"` is an illustration of output, not
     code. That marking lives in the document rather than in a list of
     positions here, because a list of positions is wrong the moment anyone
     adds a block.
     """
-    text = GUIDE.read_text(encoding="utf-8")
+    guide = Path(guide or DEFAULT_GUIDE)
+    if not guide.is_file():
+        return []
+    text = guide.read_text(encoding="utf-8")
     blocks = []
     for match in BLOCK.finditer(text):
         code = html.unescape(match.group("code"))
@@ -58,7 +69,6 @@ def guide_blocks(runnable_only=False):
     return blocks
 
 
-blocks = guide_blocks()
 
 #: Blocks that only make sense inside Colab: git clone, drive.mount, GPU name.
 COLAB_ONLY = {0, 1, 2}
@@ -118,6 +128,16 @@ import tempfile
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--guide", type=Path, default=DEFAULT_GUIDE)
+    args = parser.parse_args()
+
+    blocks = guide_blocks(guide=args.guide)
+    if not blocks:
+        print(f"No guide at {args.guide}. It is not committed; point at it "
+              f"with --guide or UNCLE_GUIDE. Nothing to check.")
+        return 0
+
     save = Path(tempfile.mkdtemp(prefix="uncle-guide-"))
     env = {
         "DATA": str((ROOT / "data" / "tiny-imagenet-200").resolve()),

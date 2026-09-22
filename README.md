@@ -24,15 +24,11 @@ and forgetting destroys the tasks it is supposed to preserve. That is a fault
 in this code, not a finding about the method, and nothing else is worth
 measuring until it is fixed.
 
-| Read this | For |
-| --- | --- |
-| [docs/PLAN.md](docs/PLAN.md) | What is done, what is next, what it costs, and what not to re-litigate |
-| `ops-docs/run-log.html` | The full record of the first end-to-end run, and a cost model fitted to it |
-| `ops-docs/colab_guide.html` | Running this on a Colab GPU, and every experiment in the paper |
-| `ops-docs/building-it-up.md` | How the data and task code were built, stage by stage |
+[docs/PLAN.md](docs/PLAN.md) has the rest: what is done, what is next, what
+each remaining experiment costs, and the decisions not to re-litigate.
 
-The `ops-docs/` write-ups are kept local and are not committed. Only the plan
-travels with the code.
+The longer write-ups, the run log and the Colab walkthrough, are kept outside
+the repository. Only the plan travels with the code.
 
 ## Run it
 
@@ -94,7 +90,6 @@ default setting, so those are the numbers to check against.
 | `scripts/` | `run.py`, `baseline.py`, and the dataset exploration scripts |
 | `notebooks/` | Dataset and task exploration, plus the original Colab notebook |
 | `docs/PLAN.md` | Reproduction plan and status |
-| `ops-docs/colab_guide.html` | Local Colab walkthrough (ignored by Git) |
 | `reference/uncle_minimal.py` | The same method in one flat file, for reading |
 | `tests/` | `test_uncle.py`, `test_tasks.py`, `test_experiments.py` |
 
@@ -140,8 +135,8 @@ generator's state. Start the same run again and it continues from the last
 finished request, making the same draws it would have made had it never
 stopped. Pass `checkpoint=False` to skip it, or `resume=False` to start over.
 
-`ops-docs/colab_guide.html` is the local walkthrough: setup cells, worked examples, and
-every experiment in the paper with what to look for.
+The Colab walkthrough, kept outside the repository, has the setup cells,
+worked examples, and every experiment in the paper with what to look for.
 
 ## What a run costs
 

@@ -76,9 +76,11 @@ class GuideTests(unittest.TestCase):
     def test_every_python_block_in_the_guide_parses(self):
         import ast
         sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-        from check_guide import guide_blocks, is_shell
+        from check_guide import DEFAULT_GUIDE, guide_blocks, is_shell
 
         blocks = guide_blocks()
+        if not blocks:
+            self.skipTest(f"No guide at {DEFAULT_GUIDE}; it is not committed")
         self.assertGreater(len(blocks), 15)
         checked = 0
         for index, block in enumerate(blocks):
