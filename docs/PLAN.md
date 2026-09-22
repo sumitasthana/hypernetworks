@@ -12,10 +12,20 @@ Last updated 2026-09-21 at commit `ca398ea`.
 
 ## 1. Our hypothesis
 
+**Working title: Component-level attribution of residual knowledge after task
+unlearning.**
+
 > Does UnCLe remove a forgotten task's information, or only remove access to
 > it? And if it is recoverable, which components of the model hold it?
 
-The second half is the sharper one. It turns a yes/no question into attribution.
+The second half is the sharper one. It turns a yes/no question into attribution,
+and it is what the title claims.
+
+One caution about that title, for whoever writes the paper. It presupposes
+there is residual knowledge to attribute. If T4.2 finds no recovery advantage
+over the paired reference, the honest title becomes a question rather than a
+claim, something nearer *Does task unlearning leave residual knowledge? A
+component-level probe*. Decide that after T4.2, not before.
 
 What is *not* being claimed: that the hypernetwork trunk is untouched by
 forgetting. It is not. Equation 3 and Algorithm 2 both optimise the
