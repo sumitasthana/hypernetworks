@@ -1,4 +1,4 @@
-# Component-level attribution of residual knowledge after task unlearning
+# Component-level Attribution of Residual Knowledge after Task Unlearning
 
 Working title. An independent reproduction of **UnCLe**, the method introduced
 in *An Unlearning Framework for Continual Learning* (Adhikari, Kumaravelu and
