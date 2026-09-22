@@ -344,6 +344,103 @@ forget   s/step = 0.0063 + 0.0475 * protected</pre>
     above rescaled to H100.</li>
 </ol>
 
+<h2>Compute planning</h2>
+<p>Every figure in the Tiny ImageNet column is measured. The other three columns are the same cost
+  model applied to settings whose geometry is exact, since the models can be built and counted, but
+  whose data loaders do not exist yet: CIFAR-100 and 5-Tasks are not implemented, and Permuted
+  MNIST has never been run at this scale. Treat them as sized, not verified.</p>
+
+<div class="tablewrap">
+<table>
+  <thead>
+    <tr><th></th><th>Tiny ImageNet</th><th>CIFAR-100</th><th>Permuted MNIST</th><th>5-Tasks</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Status</td>
+        <td><span class="verdict v-good">measured</span></td>
+        <td><span class="verdict v-warn">projected</span></td>
+        <td><span class="verdict v-warn">projected</span></td>
+        <td><span class="verdict v-warn">projected</span></td></tr>
+    <tr><td>Input</td><td class="n">3&times;64&times;64</td><td class="n">3&times;32&times;32</td>
+        <td class="n">1&times;28&times;28</td><td class="n">3&times;32&times;32</td></tr>
+    <tr><td>Tasks</td><td class="n">20</td><td class="n">10</td><td class="n">10</td><td class="n">5</td></tr>
+    <tr><td>Classes per task</td><td class="n">10</td><td class="n">10</td><td class="n">10</td><td class="n">10</td></tr>
+    <tr><td>Requests</td><td class="n">30 (18L, 12U)</td><td class="n">15 (10L, 5U)</td>
+        <td class="n">15 (10L, 5U)</td><td class="n">7 (5L, 2U)</td></tr>
+    <tr><td>Train images per task</td><td class="n">5,000</td><td class="n">5,000</td>
+        <td class="n">60,000</td><td class="n">50,000</td></tr>
+    <tr><td>Backbone</td><td class="n">ResNet50</td><td class="n">ResNet50</td>
+        <td class="n">ResNet18</td><td class="n">ResNet50</td></tr>
+    <tr><td>Conv / BN / Linear</td><td class="n">53 / 53 / 1</td><td class="n">53 / 53 / 1</td>
+        <td class="n">20 / 20 / 1</td><td class="n">53 / 53 / 1</td></tr>
+    <tr><td>Stem</td><td class="n">3&times;3 s1, maxpool kept</td><td class="n">3&times;3 s1, no maxpool</td>
+        <td class="n">3&times;3 s1, no maxpool</td><td class="n">3&times;3 s1, no maxpool</td></tr>
+    <tr><td>Generated parameters</td><td class="n">23,520,842</td><td class="n">23,520,842</td>
+        <td class="n">11,172,810</td><td class="n">23,520,842</td></tr>
+    <tr><td>In how many tensors</td><td class="n">161</td><td class="n">161</td>
+        <td class="n">62</td><td class="n">161</td></tr>
+    <tr><td>Hypernetwork parameters</td><td class="n">134,015,898</td><td class="n">134,015,898</td>
+        <td class="n">56,082,990</td><td class="n">134,015,898</td></tr>
+    <tr><td>Generator overhead</td><td class="n">5.7&times;</td><td class="n">5.7&times;</td>
+        <td class="n">5.0&times;</td><td class="n">5.7&times;</td></tr>
+    <tr><td>Chunks: weight / res / BN</td><td class="n">174 / 24 / 2</td><td class="n">174 / 24 / 2</td>
+        <td class="n">195 / 4 / 1</td><td class="n">174 / 24 / 2</td></tr>
+    <tr><td>Steps per learn</td><td class="n">395</td><td class="n">395</td>
+        <td class="n">4,690</td><td class="n">3,910</td></tr>
+    <tr><td>Beta / gamma</td><td class="n">0.01 / 0.01</td><td class="n">0.1 / 0.01</td>
+        <td class="n">0.1 / 0.01</td><td class="n">0.001 / 0.01</td></tr>
+    <tr><td>s/step, first &rarr; last learn</td><td class="n">0.095 &rarr; 0.836</td>
+        <td class="n">0.095 &rarr; 0.446</td><td class="n">0.045 &rarr; 0.212</td>
+        <td class="n">0.095 &rarr; 0.251</td></tr>
+    <tr><td><strong>Hours, one seed</strong></td><td class="n"><strong>0.93</strong></td>
+        <td class="n"><strong>0.33</strong></td><td class="n"><strong>1.69</strong></td>
+        <td class="n"><strong>0.94</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>The architecture is identical across the three ResNet50 settings: the same 53 convolutions, 53
+  batch-norm layers and one classifier, 23.5M generated numbers in 161 tensors, produced by a
+  134M-parameter hypernetwork. Only the input size, the sequence and the number of images differ.
+  Permuted MNIST is the outlier in every respect: half the generated parameters, a fifth of the
+  tensors, and a per-step cost a third of the others.</p>
+
+<div class="note">
+  <strong>Permuted MNIST is the most expensive run, by a wide margin.</strong> That is the opposite
+  of what the architecture suggests. It uses the smaller backbone and the cheapest step, but
+  60,000 images per task means 4,690 optimizer steps per learn against Tiny ImageNet's 395. Twelve
+  times the steps beats a third of the cost per step. When budgeting, count steps before counting
+  parameters.
+</div>
+
+<h3>The grid</h3>
+<p>One sequence, one seed, all four datasets is 3.9 hours. The paper's full set, UnCLe only and no
+  baselines:</p>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Block</th><th>A100 hours</th></tr></thead>
+  <tbody>
+    <tr><td>Main tables, sequence 1, 3 seeds</td><td class="n">11.7</td></tr>
+    <tr><td>Appendix H, sequences 2 and 3, 3 seeds</td><td class="n">23.3</td></tr>
+    <tr><td>ResNet18 variants, sequence 1, 3 seeds</td><td class="n">5.5</td></tr>
+    <tr><td>Beta search, 4 values</td><td class="n">15.6</td></tr>
+    <tr><td>Gamma search, 3 values</td><td class="n">11.7</td></tr>
+    <tr><td>Burn-in annealing, on and off</td><td class="n">7.8</td></tr>
+    <tr><td>Noising strategies, 4 variants</td><td class="n">15.6</td></tr>
+    <tr><td>Saturation, the learning-only arm, 3 seeds</td><td class="n">11.2</td></tr>
+    <tr><td><strong>Total</strong></td><td class="n"><strong>102.4 h, 4.3 days continuous</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>On H100s, assuming twice the throughput, 51 hours. With TF32 enabled for matrix multiplication,
+  which PyTorch leaves off by default and which this workload is unusually well suited to, plausibly
+  26. Both of those multipliers are assumptions and neither has been measured here.</p>
+
+<p>The seven baseline methods are excluded deliberately. Implementing them is weeks of work to
+  re-establish a result the paper already reports and nobody disputes.</p>
+
 <footer>
   Run of 21 September 2026 on commit c6d89ce. Every figure here is measured, from
   <code>costs_seq1_resnet50_seed0.json</code> and the run's console output, except the cost model
