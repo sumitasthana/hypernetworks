@@ -58,7 +58,8 @@ default setting, so those are the numbers to check against.
 | `main.py` | Command line for Permuted MNIST and Tiny ImageNet |
 | `scripts/` | `run.py`, `baseline.py`, and the dataset exploration scripts |
 | `notebooks/` | Dataset and task exploration, plus the original Colab notebook |
-| `docs/colab_guide.html` | How to run all of this on a Colab GPU |
+| `docs/PLAN.md` | Reproduction plan and status |
+| `ops-docs/colab_guide.html` | Local Colab walkthrough (ignored by Git) |
 | `reference/uncle_minimal.py` | The same method in one flat file, for reading |
 | `tests/` | `test_uncle.py`, `test_tasks.py`, `test_experiments.py` |
 
@@ -104,7 +105,7 @@ generator's state. Start the same run again and it continues from the last
 finished request, making the same draws it would have made had it never
 stopped. Pass `checkpoint=False` to skip it, or `resume=False` to start over.
 
-`docs/colab_guide.html` is the walkthrough: setup cells, worked examples, and
+`ops-docs/colab_guide.html` is the local walkthrough: setup cells, worked examples, and
 every experiment in the paper with what to look for.
 
 ## What a run costs

@@ -7,7 +7,8 @@ existed after a particular run. They all reproduce in plain Python in seconds.
 
     python scripts/check_guide.py
 
-Needs the dataset in data/tiny-imagenet-200. Runs on a CPU in a few minutes,
+Needs the local ops-docs/colab_guide.html and the dataset in data/tiny-imagenet-200.
+Runs on a CPU in a few minutes,
 because every call is clamped to the small backbone, a few requests and a
 hundred images per task. It checks that the code runs, not that the numbers
 mean anything.
@@ -30,7 +31,7 @@ import uncle.baseline as baseline
 import uncle.experiments as experiments
 
 ROOT = Path(__file__).resolve().parents[1]
-GUIDE = ROOT / "docs" / "colab_guide.html"
+GUIDE = ROOT / "ops-docs" / "colab_guide.html"
 
 
 BLOCK = re.compile(r'<pre(?P<attrs>[^>]*)><code>(?P<code>.*?)</code></pre>', re.S)

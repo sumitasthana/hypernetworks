@@ -10,7 +10,7 @@ What it does NOT assert is that learning beats chance. At this scale, with the
 collapse the network to identical logits for every input, and it stays there.
 Shrinking that one layer's output scale fixes it, which points at the
 initialization, the one place this code knowingly departs from the paper. See
-`docs/colab_guide.html`. Until that is settled, an accuracy assertion here would
+`ops-docs/colab_guide.html`. Until that is settled, an accuracy assertion here would
 either fail or lock in the broken behaviour, so this file tests the parts that
 are true and reliable: the plumbing, and what forgetting does to the weights.
 

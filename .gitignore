@@ -1,6 +1,9 @@
 __pycache__/
 *.py[cod]
 
+# Operational documentation stays local
+/ops-docs/
+
 # MNIST and Tiny ImageNet download on first run
 data/
 

@@ -83,7 +83,7 @@ Spill per unlearn request was `15.4, 162.8, 59.4, 48.4, 13.0, 63.0, 2.0, 4.0,
 request 15 every task sits at chance, and requests 25-29 are learns with final
 loss 2.3026 = ln(10), meaning the generator can no longer learn anything.
 
-Full record: `docs/run-log.html`.
+Full record: `ops-docs/run-log.html` (local, ignored by Git).
 
 ### Not implemented
 
@@ -141,7 +141,7 @@ Do not reintroduce these. Each cost real time.
 
 ## 5. Plan
 
-Cost figures are A100-hours from the model in `docs/run-log.html`, fitted to the
+Cost figures are A100-hours from the model in `ops-docs/run-log.html`, fitted to the
 measured run and accurate to 0.1% on it. Halve for H100.
 
 ### Phase 0. Unblock. Nothing downstream is meaningful until this passes.
