@@ -316,10 +316,10 @@ hypothesis. Build these before Phase 3, not after.
   `"noise_fixed"` (one draw sampled outside the loop, **not** the same as
   `noise_samples=1`, which draws fresh each step), `"norm_reduce"`,
   `"discard_embedding"`.
-- **Accept:** reproduces Table 8's ordering on Tiny ImageNet, namely fixed
-  noise loses retain accuracy, norm reduction barely forgets, UnCLe gets both.
-  Note that `UNI` in that table is never defined in the paper and cannot be
-  reproduced.
+- **Accept:** reproduces Table 8's ordering on Tiny ImageNet for RA and FA,
+  namely fixed noise loses retain accuracy, norm reduction barely forgets,
+  UnCLe gets both. Table 8's `UNI` and `MIA` columns are out of scope: `UNI`
+  is not reproducible at all, and `MIA` needs Appendix G, which is T5.4.
 
 **T2.3 Adaptation path for a forgotten task.** *Code, 0.5 day.*
 Required by our hypothesis, not by the paper.
