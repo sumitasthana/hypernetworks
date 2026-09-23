@@ -6,6 +6,8 @@ set, updated only while that task is being learned, and held still during
 evaluation and forgetting.
 """
 
+from collections.abc import Callable
+
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -161,7 +163,8 @@ class UnCLe:
     # -- forget --------------------------------------------------------------
 
     def forget(
-        self, task: str, protected: list[str], burn_in: int | None = None
+        self, task: str, protected: list[str], burn_in: int | None = None,
+        on_step: Callable[[dict], None] | None = None,
     ) -> list[float]:
         """Teach the hypernetwork to turn one task's code into noise. Paper eq. 3.
 
@@ -172,11 +175,18 @@ class UnCLe:
         This leaves the task's BatchNorm buffers alone, because eq. 3 covers
         generated parameters only. Those statistics are still derived from the
         forgotten task's data. See the README.
+
+        Optional on_step receives step zero and every completed update. Loss
+        components are measured before the update; callbacks can measure
+        accuracy afterward. Callback RNG consumption and model modes are
+        restored. Callbacks must not mutate model parameters or stored buffers.
         """
         if task not in self.hypernet.task_codes:
             raise ValueError(f"Task {task} was never learned.")
 
         iterations = self.config.burn_in if burn_in is None else burn_in
+        if not isinstance(iterations, int) or isinstance(iterations, bool) or iterations < 1:
+            raise ValueError("burn_in must be a positive integer.")
 
         snapshot = self.hypernet.snapshot()
         self._reference = {}
@@ -186,13 +196,17 @@ class UnCLe:
         for parameter in trainable:
             parameter.requires_grad_(True)
 
-        optimizer = torch.optim.Adam(trainable, lr=self.config.learning_rate)
+        rate = self.config.forgetting_learning_rate
+        optimizer = torch.optim.Adam(
+            trainable, lr=self.config.learning_rate if rate is None else rate)
         self.hypernet.train()
         losses = []
 
+        self._notify_forget_step(on_step, {"step": 0})
+
         bar = progress_bar(iterations, f"forget {task}", self.progress, leave=False)
 
-        for _ in range(iterations):
+        for step in range(1, iterations + 1):
             raw = self.hypernet.raw_for(task)
 
             # The paper averages over fresh draws so the hypernetwork cannot
@@ -206,18 +220,44 @@ class UnCLe:
                 for _ in range(self.config.noise_samples)
             ) / self.config.noise_samples
 
-            loss = self.config.gamma * to_noise + self.preserve(protected, snapshot)
+            preservation = self.preserve(protected, snapshot)
+            weighted_noise = self.config.gamma * to_noise
+            loss = weighted_noise + preservation
 
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             optimizer.step()
 
             losses.append(loss.item())
+            if on_step is not None:
+                self._notify_forget_step(on_step, {
+                    "step": step,
+                    "noise_loss_before": to_noise.item(),
+                    "weighted_noise_before": weighted_noise.item(),
+                    "preserve_before": preservation.item(),
+                    "total_loss_before": loss.item(),
+                })
             bar.update(1)
             bar.set_postfix_str(f"loss {loss.item():.3f}")
 
         bar.close()
         return losses
+
+    def _notify_forget_step(self, callback, record):
+        """Keep observational evaluation from changing subsequent updates."""
+        if callback is None:
+            return
+        modules = list(self.hypernet.modules())
+        if self.target is not None:
+            modules += list(self.target.modules())
+        modes = [(module, module.training) for module in modules]
+        devices = list(range(torch.cuda.device_count())) if self.device.type == "cuda" else []
+        try:
+            with torch.random.fork_rng(devices=devices), torch.no_grad():
+                callback(record)
+        finally:
+            for module, training in modes:
+                module.training = training
 
     # -- measurement ---------------------------------------------------------
 

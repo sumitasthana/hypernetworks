@@ -61,7 +61,7 @@ def save(path, *, config, hypernet, uncle, history, seen, forgotten,
     os.replace(temporary, path)
 
 
-def load(path, config):
+def load(path, config=None):
     """Read a checkpoint, or return None when there is nothing to resume.
 
     Refuses a checkpoint whose config differs anywhere at all. Resuming one
@@ -69,17 +69,29 @@ def load(path, config):
     silent mismatch is worse than starting over. This matters most for a
     sweep: changing beta or gamma keeps the file name, because only the
     sequence, backbone and seed are in it.
+
+    With config=None, read the saved configuration without a resume comparison.
+    Diagnostic callers use that configuration to build the saved architecture.
+    Only load trusted checkpoints, which can contain Python objects.
     """
     path = Path(path)
     if not path.exists():
         return None
 
-    payload = torch.load(path, map_location=config.torch_device, weights_only=False)
+    # Keep RNG states on CPU. Model tensors are copied to the destination by
+    # load_state_dict; buffers are moved explicitly in restore.
+    payload = torch.load(path, map_location="cpu", weights_only=False)
 
     if payload.get("format") != FORMAT:
         raise ValueError(
             f"{path} was written in format {payload.get('format')}, "
             f"this code reads {FORMAT}. Delete it to start over.")
+
+    # Older checkpoints predate the optional forgetting-only learning rate.
+    # None preserves their original behavior and is the only migrated default.
+    payload["config"].setdefault("forgetting_learning_rate", None)
+    if config is None:
+        return payload
 
     now = dict(vars(config))
     saved = payload["config"]
@@ -102,15 +114,35 @@ def restore(payload, *, hypernet, uncle) -> int:
     are a ParameterDict that starts empty and grows one entry per learned
     task.
     """
+    cpu_rng = _rng_state(payload["rng"], "CPU")
+    cuda_rng = payload["cuda_rng"]
+    if cuda_rng is not None and torch.cuda.is_available():
+        if len(cuda_rng) != torch.cuda.device_count():
+            raise ValueError("Checkpoint CUDA RNG device count differs from this runtime.")
+        # Never skip an entry: its position identifies the corresponding GPU.
+        cuda_rng = [_rng_state(state, f"CUDA device {i}")
+                    for i, state in enumerate(cuda_rng)]
+
     for task in payload["tasks_with_codes"]:
         if task not in hypernet.task_codes:
             hypernet.add_task(task)
 
     hypernet.load_state_dict(payload["hypernet"])
-    uncle.task_buffers = payload["task_buffers"]
+    uncle.task_buffers = {
+        task: {name: value.to(uncle.device).clone() for name, value in buffers.items()}
+        for task, buffers in payload["task_buffers"].items()
+    }
+    uncle._reference = {}
 
-    torch.set_rng_state(payload["rng"].cpu().to(torch.uint8))
-    if payload["cuda_rng"] is not None and torch.cuda.is_available():
-        torch.cuda.set_rng_state_all(payload["cuda_rng"])
+    torch.set_rng_state(cpu_rng)
+    if cuda_rng is not None and torch.cuda.is_available():
+        torch.cuda.set_rng_state_all(cuda_rng)
 
     return len(payload["history"])
+
+
+def _rng_state(state, name):
+    """Normalize device placement without silently converting corrupt state."""
+    if not isinstance(state, torch.Tensor) or state.dtype != torch.uint8 or state.ndim != 1:
+        raise ValueError(f"{name} RNG state must be a one-dimensional uint8 tensor.")
+    return state.detach().cpu().contiguous()

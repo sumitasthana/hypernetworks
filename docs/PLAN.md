@@ -8,6 +8,12 @@ hypothesis; those are marked **dual purpose** and should not be run twice.
 
 Last updated 2026-09-22.
 
+Experiment follow-up: [EXPERIMENT_LOG.md](EXPERIMENT_LOG.md) records the reported
+short-run results through E09 and the checkpoint-based diagnostic refactor.
+No measured trajectory has passed both forgetting and retention criteria yet.
+Use [the fresh diagnostic notebook](../notebooks/03_forgetting_diagnostics.ipynb)
+for E10; preserve the pre-forgetting checkpoint and avoid repeating learning.
+
 ---
 
 ## 1. Our hypothesis

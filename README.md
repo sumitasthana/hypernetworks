@@ -138,6 +138,59 @@ stopped. Pass `checkpoint=False` to skip it, or `resume=False` to start over.
 The Colab walkthrough, kept outside the repository, has the setup cells,
 worked examples, and every experiment in the paper with what to look for.
 
+## Diagnose forgetting from a checkpoint
+
+Start with [the fresh diagnostic notebook](notebooks/03_forgetting_diagnostics.ipynb)
+([open in Colab](https://colab.research.google.com/github/sumitasthana/hypernetworks/blob/main/notebooks/03_forgetting_diagnostics.ipynb)).
+The [experiment log](docs/EXPERIMENT_LOG.md) records the results, limitations, and
+next comparison through E09. E10 has not yet been measured.
+
+Use a checkpoint saved after learning the target task and before forgetting it.
+This restores the model, task buffers, and random state on every call. It runs
+only forgetting, through the same `UnCLe.forget` method used by experiments.
+
+```python
+from uncle import diagnose_forgetting
+
+# Restore the same trained model for every comparison. No learning is repeated.
+# Change forgetting_lr or gamma here, rather than editing the training loop.
+report = diagnose_forgetting(
+    checkpoint=CHECKPOINT,
+    task="3",
+    root=DATA,               # extracted Tiny ImageNet directory
+    forgetting_lr=1e-5,      # affects forgetting only
+    gamma=1e-5,              # noise-loss coefficient
+    steps=10,               # exactly ten continuous Adam updates
+)
+print(report["report_path"])
+```
+
+The helper prints step-zero accuracy and accuracy after every update. Noise
+and preservation losses describe the model before that update. Evaluation
+preserves the update's random-number stream and model modes. It does not reset
+Adam or the frozen reference between steps. All other seen tasks are protected,
+including previously forgotten tasks.
+
+A uniquely named JSON report is saved under `diagnostics/` beside the checkpoint,
+or in the directory passed as `output`. It records both training and diagnostic
+settings, evaluation sizes, initial agreement with saved accuracies, and each
+step's measurements. The source checkpoint is never overwritten. An interrupted
+trace retains completed observations; a new call starts again from the source
+checkpoint. Tiny ImageNet evaluation uses full validation splits, so initial
+accuracy can differ from a checkpoint evaluated on capped images.
+
+For ordinary experiment runs, pass `forgetting_learning_rate=1e-5` to
+`run_experiment`. Its default is `None`, which preserves the previous behavior
+of sharing `learning_rate` between learning and forgetting. Old checkpoints
+without this field remain readable. Diagnostics can override the forgetting
+rate without changing the saved training configuration.
+
+Check the diagnostic machinery without downloading data:
+
+```bash
+python tests/test_diagnostics.py
+```
+
 ## What a run costs
 
 `uncle/telemetry.py` times each request and records peak GPU memory around it,

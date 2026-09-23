@@ -1,6 +1,7 @@
 """Every knob in one place, with the paper's values as the defaults."""
 
 from dataclasses import dataclass, field
+import math
 
 import torch
 
@@ -107,6 +108,7 @@ class Config:
     batch_size: int = 64
     eval_batch_size: int = 256
     learning_rate: float = 1e-3       # Adam, the paper's value
+    forgetting_learning_rate: float | None = None  # None follows learning_rate
 
     beta: float = 0.1     # hold-other-tasks-still term, eq. 2. Paper: 0.1 for PMNIST
     gamma: float = 0.01   # push-toward-noise term, eq. 3. Paper: 0.01 for PMNIST
@@ -126,6 +128,11 @@ class Config:
     device: str = field(default_factory=_default_device)
 
     def __post_init__(self) -> None:
+        if self.forgetting_learning_rate is not None and (
+            not math.isfinite(self.forgetting_learning_rate)
+            or self.forgetting_learning_rate <= 0
+        ):
+            raise ValueError("forgetting_learning_rate must be finite and positive.")
         # The request list is the part a user edits most, so check it properly.
         learned: set[str] = set()
         forgotten: set[str] = set()

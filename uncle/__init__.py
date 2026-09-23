@@ -10,6 +10,7 @@ which needs no data at all.
 
 from .baseline import run_baseline
 from .config import Config
+from .diagnostics import diagnose_forgetting
 from .experiment import run
 from .experiments import compare, make_config, run_experiment, run_sequences
 from .hypernet import HyperNetwork, build_target
@@ -24,6 +25,7 @@ __all__ = [
     "build_target",
     "build_tasks",
     "compare",
+    "diagnose_forgetting",
     "make_config",
     "relapse",
     "run",
