@@ -30,7 +30,7 @@ The latest Colab session expired. The model and diagnostic reports were saved
 on Drive, but their current availability has not been checked from this machine.
 In a fresh GPU runtime, run notebook sections 1-3 only to mount Drive and inspect
 the checkpoint. Expected saved accuracies: task 3 = 26.0%, task 0 = 44.6%.
-Stop before section 4, which still contains the historical E10 experiment.
+Stop before section 4, which contains a saved E14 run with older E10 explanatory text.
 The proposed parameter-group diagnostic is not implemented yet.
 
 ## Question and protocol
@@ -564,6 +564,25 @@ regression was skipped because the local machine has no CUDA device. All 19
 executable Colab-guide examples passed after supplying an isolated local IPython
 dependency. These checks establish software behavior on the tested environment;
 they do not reproduce the GPU research outcomes above.
+
+### Evidence added from the saved notebook on 2026-09-24
+
+The newer notebook commit `4407978` contains saved outputs that corroborate
+E13 settings (LR 0.00001, gamma 0.000003, 50 steps, ten noise samples) and E14
+settings (LR 0.00001, gamma 0.000005, 50 steps, ten noise samples). This updates
+the earlier notes saying those settings had not been supplied. The E13 cell
+reads its older saved report; it is not another E14 result.
+
+Setup outputs report Tesla T4 and source commit `04c31b3`. E14's 50 printed
+accuracy pairs match the conversation trace. All 50 weighted-noise and
+preservation pairs are now in the CSV. Weighted noise falls from 1938.36 to
+1731.68 while preservation rises from zero to 13.70. These sampled changes
+do not establish relative gradient strength or explain the failure by themselves.
+The original report JSON remains on Drive and was not read from this machine.
+
+[Archived notebook outputs](experiments/notebook_saved_outputs.txt) retain this
+evidence with its source commit and cell indices. The notebook has historical
+E10 prose alongside E14 code and outputs; follow the current status here.
 
 ## Next priority: objective diagnostics (T0.2)
 

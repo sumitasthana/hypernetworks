@@ -147,7 +147,7 @@ findings through E14. No measured step passes both forgetting and retention
 criteria. [Structured observations](docs/experiments/README.md) preserve the
 supplied traces and their provenance. The next priority is objective diagnostics.
 After a session restart, run notebook sections 1-3 only; section 4 still contains
-the historical E10 run, not the proposed parameter-group diagnostic.
+the saved E14 run with older E10 prose, not the proposed parameter-group diagnostic.
 
 Use a checkpoint saved after learning the target task and before forgetting it.
 This restores the model, task buffers, and random state on every call. It runs

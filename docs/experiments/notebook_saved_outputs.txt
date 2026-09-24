@@ -1,0 +1,146 @@
+Saved text outputs from notebooks/03_forgetting_diagnostics.ipynb
+Source Git commit: 44079783b9a7e83efa5f733834724640236ae391
+Notebook cells can retain outputs from different runs; see cell labels below.
+
+=== Notebook cell index 1 (zero-based) ===
+Repository commit: 04c31b377a10d14096cf74756f2f72a21751e538
+
+=== Notebook cell index 3 (zero-based) ===
+Mounted at /content/drive
+GPU: Tesla T4
+Package: /content/uncle-diagnostics/uncle/__init__.py
+Checkpoint: /content/drive/MyDrive/uncle/E08_forgetting_trace/before_forgetting.pt
+New reports: /content/drive/MyDrive/uncle/E08_forgetting_trace/diagnostics
+
+=== Notebook cell index 5 (zero-based) ===
+backbone resnet50
+epochs 5
+learning_rate 0.0001
+seed 0
+chunks 200
+Saved accuracies: {'3': 26.0, '0': 44.6}
+
+=== Notebook cell index 7 (zero-based) ===
+step   0  3: 26.0%  0: 44.6%
+step   1  3: 23.0%  0: 45.0%  noise=1938.36  preserve=0.00
+step   2  3: 22.0%  0: 45.6%  noise=1927.39  preserve=7.25
+step   3  3: 21.0%  0: 46.0%  noise=1921.92  preserve=8.82
+step   4  3: 19.4%  0: 46.2%  noise=1918.78  preserve=7.22
+step   5  3: 18.6%  0: 46.4%  noise=1916.59  preserve=5.26
+step   6  3: 18.0%  0: 46.6%  noise=1914.14  preserve=3.70
+step   7  3: 17.0%  0: 46.2%  noise=1910.84  preserve=2.73
+step   8  3: 16.2%  0: 45.8%  noise=1906.76  preserve=2.48
+step   9  3: 16.0%  0: 44.6%  noise=1902.21  preserve=2.94
+step  10  3: 16.2%  0: 44.6%  noise=1897.02  preserve=3.91
+step  11  3: 16.2%  0: 44.8%  noise=1891.83  preserve=4.95
+step  12  3: 16.4%  0: 44.6%  noise=1886.97  preserve=5.68
+step  13  3: 17.0%  0: 44.6%  noise=1882.44  preserve=5.96
+step  14  3: 16.4%  0: 44.6%  noise=1878.28  preserve=5.91
+step  15  3: 16.4%  0: 44.4%  noise=1874.42  preserve=5.72
+step  16  3: 16.4%  0: 43.8%  noise=1870.54  preserve=5.54
+step  17  3: 15.6%  0: 43.4%  noise=1866.52  preserve=5.46
+step  18  3: 15.4%  0: 43.2%  noise=1862.40  preserve=5.53
+step  19  3: 15.0%  0: 42.4%  noise=1857.97  preserve=5.78
+step  20  3: 14.8%  0: 42.8%  noise=1853.50  preserve=6.21
+step  21  3: 14.2%  0: 42.8%  noise=1848.98  preserve=6.77
+step  22  3: 13.8%  0: 42.4%  noise=1844.47  preserve=7.34
+step  23  3: 13.6%  0: 41.8%  noise=1839.96  preserve=7.80
+step  24  3: 13.6%  0: 41.4%  noise=1835.72  preserve=8.07
+step  25  3: 13.0%  0: 41.2%  noise=1831.51  preserve=8.18
+step  26  3: 13.0%  0: 41.4%  noise=1827.64  preserve=8.21
+step  27  3: 12.6%  0: 41.2%  noise=1823.51  preserve=8.25
+step  28  3: 12.8%  0: 40.8%  noise=1819.55  preserve=8.36
+step  29  3: 13.2%  0: 39.8%  noise=1815.45  preserve=8.57
+step  30  3: 13.4%  0: 40.2%  noise=1811.30  preserve=8.88
+step  31  3: 14.0%  0: 40.2%  noise=1806.93  preserve=9.26
+step  32  3: 14.0%  0: 40.0%  noise=1802.72  preserve=9.69
+step  33  3: 13.8%  0: 40.0%  noise=1798.42  preserve=10.09
+step  34  3: 13.6%  0: 39.8%  noise=1794.36  preserve=10.41
+step  35  3: 13.0%  0: 39.8%  noise=1790.24  preserve=10.63
+step  36  3: 13.2%  0: 39.2%  noise=1786.33  preserve=10.76
+step  37  3: 13.4%  0: 39.0%  noise=1782.49  preserve=10.85
+step  38  3: 13.0%  0: 39.2%  noise=1778.51  preserve=10.97
+step  39  3: 13.0%  0: 39.0%  noise=1774.61  preserve=11.15
+step  40  3: 12.8%  0: 38.6%  noise=1770.65  preserve=11.39
+step  41  3: 13.0%  0: 38.0%  noise=1766.61  preserve=11.69
+step  42  3: 13.0%  0: 38.0%  noise=1762.53  preserve=12.03
+step  43  3: 12.6%  0: 38.0%  noise=1758.52  preserve=12.36
+step  44  3: 12.4%  0: 38.0%  noise=1754.57  preserve=12.65
+step  45  3: 12.6%  0: 38.2%  noise=1750.76  preserve=12.87
+step  46  3: 12.6%  0: 38.0%  noise=1746.82  preserve=13.04
+step  47  3: 12.6%  0: 38.0%  noise=1743.09  preserve=13.17
+step  48  3: 12.6%  0: 37.8%  noise=1739.28  preserve=13.32
+step  49  3: 12.6%  0: 37.8%  noise=1735.46  preserve=13.49
+step  50  3: 12.6%  0: 37.4%  noise=1731.68  preserve=13.70
+Saved diagnostic: /content/drive/MyDrive/uncle/E08_forgetting_trace/diagnostics/forget_20260923_151049_593433_8a010c9b.json
+Saved report: /content/drive/MyDrive/uncle/E08_forgetting_trace/diagnostics/forget_20260923_151049_593433_8a010c9b.json
+
+=== Notebook cell index 9 (zero-based) ===
+step  task3  task0  task0_drift  passes_screen
+   0   26.0   44.6          0.0  False
+   1   23.0   45.0          0.4  False
+   2   22.0   45.6          1.0  False
+   3   21.0   46.0          1.4  False
+   4   19.4   46.2          1.6  False
+   5   18.6   46.4          1.8  False
+   6   18.0   46.6          2.0  False
+   7   17.0   46.2          1.6  False
+   8   16.2   45.8          1.2  False
+   9   16.0   44.6          0.0  False
+  10   16.2   44.6          0.0  False
+  11   16.2   44.8          0.2  False
+  12   16.4   44.6          0.0  False
+  13   17.0   44.6          0.0  False
+  14   16.4   44.6          0.0  False
+  15   16.4   44.4          0.2  False
+  16   16.4   43.8          0.8  False
+  17   15.6   43.4          1.2  False
+  18   15.4   43.2          1.4  False
+  19   15.0   42.4          2.2  False
+  20   14.8   42.8          1.8  False
+  21   14.2   42.8          1.8  False
+  22   13.8   42.4          2.2  False
+  23   13.6   41.8          2.8  False
+  24   13.6   41.4          3.2  False
+  25   13.0   41.2          3.4  False
+  26   13.0   41.4          3.2  False
+  27   12.6   41.2          3.4  False
+  28   12.8   40.8          3.8  False
+  29   13.2   39.8          4.8  False
+  30   13.4   40.2          4.4  False
+  31   14.0   40.2          4.4  False
+  32   14.0   40.0          4.6  False
+  33   13.8   40.0          4.6  False
+  34   13.6   39.8          4.8  False
+  35   13.0   39.8          4.8  False
+  36   13.2   39.2          5.4  False
+  37   13.4   39.0          5.6  False
+  38   13.0   39.2          5.4  False
+  39   13.0   39.0          5.6  False
+  40   12.8   38.6          6.0  False
+  41   13.0   38.0          6.6  False
+  42   13.0   38.0          6.6  False
+  43   12.6   38.0          6.6  False
+  44   12.4   38.0          6.6  False
+  45   12.6   38.2          6.4  False
+  46   12.6   38.0          6.6  False
+  47   12.6   38.0          6.6  False
+  48   12.6   37.8          6.8  False
+  49   12.6   37.8          6.8  False
+  50   12.6   37.4          7.2  False
+Passing steps: []
+Screening summary: /content/drive/MyDrive/uncle/E08_forgetting_trace/diagnostics/forget_20260923_151049_593433_8a010c9b.screen.json
+STOP: share the table and report before selecting another experiment.
+{'forgetting_lr': 1e-05, 'gamma': 5e-06, 'steps': 50, 'noise_samples': 10}
+
+=== Notebook cell index 11 (zero-based) ===
+Settings: {'forgetting_lr': 1e-05, 'gamma': 3e-06, 'steps': 50, 'noise_samples': 10}
+Status: complete
+step  weighted_noise  preservation  total_loss
+   1         1163.01          0.00     1163.01
+  10         1140.43          3.66     1144.09
+  20         1117.63          4.15     1121.78
+  30         1095.24          5.29     1100.53
+  40         1073.38          6.50     1079.88
+  50         1052.21          7.66     1059.87
+

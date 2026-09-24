@@ -5,11 +5,14 @@ earlier learning runs, decisions, limitations, and code findings.
 
 | File | Contents |
 | --- | --- |
-| [forgetting_traces.csv](forgetting_traces.csv) | All 197 supplied accuracy observations for E08-E14, including each starting row. E08/E09 also include their supplied loss components. |
+| [forgetting_traces.csv](forgetting_traces.csv) | All 197 supplied accuracy observations for E08-E14, including each starting row. E08/E09 include supplied losses; E14 includes all 50 loss pairs from saved notebook output. |
 | [e13_sampled_losses.csv](e13_sampled_losses.csv) | Six separately supplied E13 loss observations. |
+| [notebook_saved_outputs.txt](notebook_saved_outputs.txt) | Text outputs preserved from notebook commit `4407978`, including E14 loss trace, environment setup and E13 sampled losses. |
 | [manifest.json](manifest.json) | Intended settings, evidence limits, reported artifact locations, and derived screening summaries. |
 
-These files transcribe the tables supplied in the conversation. Original Colab
+These files transcribe the conversation tables and the saved notebook outputs.
+The latter corroborate E13/E14 settings and add E14 loss components. The
+notebook contains outputs from multiple runs; do not assign every cell to E14. Original Colab
 JSON files and model checkpoints are not included or verified here. Earlier
 runtime-local files may have been lost when sessions ended. Drive paths record
 reported locations, not a guarantee that those files currently exist.
