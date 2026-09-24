@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "updated": "2026-09-24",
+  "provenance": "Transcriptions of results supplied by the user; not original runtime JSON or independently reproduced GPU measurements.",
+  "checkpoint_reported_path": "/content/drive/MyDrive/uncle/E08_forgetting_trace/before_forgetting.pt",
+  "thresholds": {
+    "minimum_initial_accuracy_pct": 25,
+    "target_accuracy_at_most_pct": 12,
+    "retained_absolute_drift_strictly_under_pp": 5
+  },
+  "hardware_evidence": {
+    "E10": "Tesla T4 explicitly reported",
+    "E11-E14": "same runtime requested; separate GPU identity not supplied with each result",
+    "earlier_logs": "NVIDIA L4 reported; do not infer every run environment from this"
+  },
+  "original_artifacts_in_repository": false,
+  "runs": [
+    {
+      "run": "E08",
+      "source": "user-pasted table, transcribed in ../EXPERIMENT_LOG.md",
+      "intended_settings": {
+        "forgetting_lr": 0.0001,
+        "gamma": 0.0001,
+        "steps": 10
+      },
+      "settings_verification": "original configuration JSON not independently inspected",
+      "reported_artifact_paths": [
+        "forget_trace_20260923_020958_555174.json"
+      ],
+      "passing_steps": [],
+      "first_retention_failure_step": 1,
+      "minimum_task3_accuracy_pct": 10.0
+    },
+    {
+      "run": "E09",
+      "source": "user-pasted table, transcribed in ../EXPERIMENT_LOG.md",
+      "intended_settings": {
+        "forgetting_lr": 1e-05,
+        "gamma": 0.0001,
+        "steps": 10
+      },
+      "settings_verification": "original configuration JSON not independently inspected",
+      "reported_artifact_paths": [
+        "E09_forget_lr_1e-5_20260923_022053_354220.json"
+      ],
+      "passing_steps": [],
+      "first_retention_failure_step": 6,
+      "minimum_task3_accuracy_pct": 15.8
+    },
+    {
+      "run": "E10",
+      "source": "user-pasted table, transcribed in ../EXPERIMENT_LOG.md",
+      "intended_settings": {
+        "forgetting_lr": 1e-05,
+        "gamma": 1e-05,
+        "steps": 10
+      },
+      "settings_verification": "original configuration JSON not independently inspected",
+      "reported_artifact_paths": [
+        "/content/drive/MyDrive/uncle/E08_forgetting_trace/diagnostics/forget_20260923_142742_335991_88cd96f2.screen.json"
+      ],
+      "passing_steps": [],
+      "first_retention_failure_step": null,
+      "minimum_task3_accuracy_pct": 16.0
+    },
+    {
+      "run": "E11",
+      "source": "user-pasted table, transcribed in ../EXPERIMENT_LOG.md",
+      "intended_settings": {
+        "forgetting_lr": 1e-05,
+        "gamma": 1e-05,
+        "steps": 30
+      },
+      "settings_verification": "original configuration JSON not independently inspected",
+      "reported_artifact_paths": [
+        "/content/drive/MyDrive/uncle/E08_forgetting_trace/diagnostics/forget_20260923_143249_572038_f52e5457.screen.json"
+      ],
+      "passing_steps": [],
+      "first_retention_failure_step": 23,
+      "minimum_task3_accuracy_pct": 12.6
+    },
+    {
+      "run": "E12",
+      "source": "user-pasted table, transcribed in ../EXPERIMENT_LOG.md",
+      "intended_settings": {
+        "forgetting_lr": 1e-05,
+        "gamma": 3e-06,
+        "steps": 30
+      },
+      "settings_verification": "original configuration JSON not independently inspected",
+      "reported_artifact_paths": [
+        "/content/drive/MyDrive/uncle/E08_forgetting_trace/diagnostics/forget_20260923_143653_273412_d31bb28c.screen.json"
+      ],
+      "passing_steps": [],
+      "first_retention_failure_step": null,
+      "minimum_task3_accuracy_pct": 13.0
+    },
+    {
+      "run": "E13",
+      "source": "user-pasted table, transcribed in ../EXPERIMENT_LOG.md",
+      "intended_settings": {
+        "forgetting_lr": 1e-05,
+        "gamma": 3e-06,
+        "steps": 50
+      },
+      "settings_verification": "original configuration JSON not independently inspected",
+      "reported_artifact_paths": [
+        "/content/drive/MyDrive/uncle/E08_forgetting_trace/diagnostics/forget_20260923_143926_526429_aa83a19b.screen.json"
+      ],
+      "passing_steps": [],
+      "first_retention_failure_step": null,
+      "minimum_task3_accuracy_pct": 13.0
+    },
+    {
+      "run": "E14",
+      "source": "user-pasted table, transcribed in ../EXPERIMENT_LOG.md",
+      "intended_settings": {
+        "forgetting_lr": 1e-05,
+        "gamma": 5e-06,
+        "steps": 50
+      },
+      "settings_verification": "original configuration JSON not independently inspected",
+      "reported_artifact_paths": [
+        "/content/drive/MyDrive/uncle/E08_forgetting_trace/diagnostics/forget_20260923_151049_593433_8a010c9b.screen.json"
+      ],
+      "passing_steps": [],
+      "first_retention_failure_step": 36,
+      "minimum_task3_accuracy_pct": 12.4
+    }
+  ]
+}

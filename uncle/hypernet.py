@@ -238,6 +238,9 @@ class HyperNetwork(nn.Module):
     def weights_from_code(self, code: torch.Tensor) -> dict[str, torch.Tensor]:
         """One task code in, a full set of target weights out: theta = H(e; phi)."""
         generated = self._raw_groups(code)
+        # This multiplication converts raw outputs to classifier weights.
+        # Prediction and the preservation penalty use this scaled path;
+        # the forgetting noise loss uses raw_for(), which bypasses it.
         return {
             name: generated[group][start:start + shape.numel()].reshape(shape)
                   * self.scales[name]

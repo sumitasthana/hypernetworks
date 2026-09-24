@@ -143,7 +143,11 @@ worked examples, and every experiment in the paper with what to look for.
 Start with [the fresh diagnostic notebook](notebooks/03_forgetting_diagnostics.ipynb)
 ([open in Colab](https://colab.research.google.com/github/sumitasthana/hypernetworks/blob/main/notebooks/03_forgetting_diagnostics.ipynb)).
 The [experiment log](docs/EXPERIMENT_LOG.md) records the results, limitations, and
-next comparison through E09. E10 has not yet been measured.
+findings through E14. No measured step passes both forgetting and retention
+criteria. [Structured observations](docs/experiments/README.md) preserve the
+supplied traces and their provenance. The next priority is objective diagnostics.
+After a session restart, run notebook sections 1-3 only; section 4 still contains
+the historical E10 run, not the proposed parameter-group diagnostic.
 
 Use a checkpoint saved after learning the target task and before forgetting it.
 This restores the model, task buffers, and random state on every call. It runs

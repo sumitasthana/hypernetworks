@@ -82,6 +82,10 @@ class UnCLe:
                 with torch.no_grad():
                     before = snapshot.weights_from_code(code)
                 self._reference[task] = before
+            # Preservation compares SCALED classifier weights: both `before`
+            # and `now` include HyperNetwork.scales[name]. A raw change delta
+            # therefore contributes scale**2 * delta**2 to this penalty.
+            # The forgetting noise term below instead uses unscaled outputs.
             now = self.hypernet.weights_from_code(code)
             total = total + sum(
                 (now[name] - before[name]).square().sum() for name in now
@@ -207,6 +211,10 @@ class UnCLe:
         bar = progress_bar(iterations, f"forget {task}", self.progress, leave=False)
 
         for step in range(1, iterations + 1):
+            # Forgetting compares RAW generator outputs with unit Gaussian
+            # noise, before HyperNetwork.scales[name] is applied. In contrast,
+            # preserve() compares scaled weights. Since scales vary by layer,
+            # gamma does not remove this difference in layer weighting.
             raw = self.hypernet.raw_for(task)
 
             # The paper averages over fresh draws so the hypernetwork cannot

@@ -6,13 +6,13 @@ Working document for whoever picks this up next, human or agent. Reproduce
 needs. Several of the paper's own experiments double as controls for that
 hypothesis; those are marked **dual purpose** and should not be run twice.
 
-Last updated 2026-09-22.
+Last updated 2026-09-24.
 
 Experiment follow-up: [EXPERIMENT_LOG.md](EXPERIMENT_LOG.md) records the reported
-short-run results through E09 and the checkpoint-based diagnostic refactor.
+short-run results through E14 and the checkpoint-based diagnostic refactor.
 No measured trajectory has passed both forgetting and retention criteria yet.
 Use [the fresh diagnostic notebook](../notebooks/03_forgetting_diagnostics.ipynb)
-for E10; preserve the pre-forgetting checkpoint and avoid repeating learning.
+as the interface for the next objective diagnostic (T0.2); pause scalar sweeps.
 
 ---
 
@@ -258,9 +258,11 @@ verdict, either TUNING with the winning gamma or STRUCTURAL with the next
 places to look.
 - Record for each: task 0's accuracy before and after the forget, and
   `mean_spill`.
-- **Accept:** a gamma exists where task 3 lands at or below 12% and task 0
-  moves by less than 5 points. Then it is tuning, and T0.3 is unnecessary.
-- **If no gamma works:** it is structural. Go to T0.2.
+- **Accept:** a measured step has task 3 at or below 12% and task 0
+  moves by less than 5 points. Treat this as a tuning candidate; T0.3
+  full-sequence validation is still required.
+- **If the tested gamma values fail:** investigate the objective in T0.2.
+  A finite sweep does not prove a structural cause or rule out other settings.
 
 **T0.2 Structural check on the forget objective.** *0.5 h.* Only if T0.1 fails.
 - Compare `preserve` summed over protected tasks against averaged
